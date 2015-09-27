@@ -4,11 +4,20 @@ require 'nn'
 local trainer = torch.class('trainer')
 
 function trainer:__init()
-  self.var = 10
+  self.model = require 'model'
+  self.train_data, self.test_data = require 'data'
 end
 
 function trainer:train()
-  self.var = self.var + 1
+  print('==> training net on sample...')
+  self.model:training()
+  -- pass
+end
+
+function trainer:evaluate_sentence(sentence)
+  print('==> testing net on sample...')
+  self.model:evaluate()
+  self.model:forward(sentence)
 end
 
 return trainer
