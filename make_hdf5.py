@@ -49,3 +49,5 @@ labels = [1] * len(pos_data) + [2] * len(neg_data)
 with h5py.File("rt-polarity.hdf5", "w") as f:
     f["train"] = np.array(pos_data + neg_data, dtype=np.int32)
     f["train_label"] = np.array(labels)
+
+# TODO(jeffreyling): Need to write word_to_idx
