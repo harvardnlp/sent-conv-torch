@@ -36,7 +36,7 @@ for line in pos_file:
 
     pos_data.append(sent)
 
-for i,line in enumerate(neg_file):
+for line in neg_file:
     words = line.strip().split(' ')
     sent = [word_to_idx[word] for word in words]
     if len(sent) < max_sent_len:
@@ -52,3 +52,6 @@ with h5py.File("rt-polarity.hdf5", "w") as f:
 
 print 'Vocab size:', len(word_to_idx)
 # TODO(jeffreyling): Need to write word_to_idx
+
+pos_file.close()
+neg_file.close()

@@ -1,6 +1,7 @@
+require 'cutorch'
 require 'hdf5'
 require 'nn'
-local trainer = require 'trainer'
+local Trainer = require 'trainer'
 local model = require 'model'
 
 local f = hdf5.open('rt-polarity.hdf5', 'r')
@@ -8,27 +9,22 @@ local train = f:read('train'):all()
 local train_label = f:read('train_label'):all()
 -- local word_idx_map = f:read('word_idx_map'):all()
 
--- temporary
-local test = train:clone()
-local test_label = train_label:clone()
-
--- Format is
--- *  'data': 2-d tensor, train size by max sentence len
--- *  'label': 1-d tensor, train size
-local train_data = {
-  data = train,
-  labels = train_label
-}
-local test_data = {
-  data = test,
-  labels = test_label
-}
-
-local train = trainer.new()
+local trainer = Trainer.new()
 local criterion = nn.ClassNLLCriterion()
 
-for i = 1, 5 do
-  train:train(train_data, model, criterion)
-end
+-- move to GPU
+model:cuda()
+criterion:cuda()
 
-train:test(test_data)
+for epoch = 1, 10 do
+  -- shuffle data
+  local shuffle = torch.randperm(train:size(1))
+  train = train:index(1, shuffle:long())
+  train_label = train_label:index(1, shuffle:long())
+
+  print('==> training epoch ' .. epoch)
+  trainer:train(train, train_label, model, criterion)
+
+  print('==> evaluate...')
+  trainer:test(train, train_label, model, criterion)
+end

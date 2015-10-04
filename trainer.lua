@@ -1,10 +1,11 @@
 require 'nn'
 require 'optim'
 require 'sys'
+require 'cutorch'
 
-local trainer = torch.class('trainer')
+local Trainer = torch.class('Trainer')
 
-function trainer:__init()
+function Trainer:__init()
   self.optim_method = optim.adadelta
   self.config = {
     eps = 1e-10
@@ -17,34 +18,26 @@ function trainer:__init()
 end
 
 -- Perform one epoch of training.
-function trainer:train(train_data, model, criterion)
-  print('==> training epoch...')
+function Trainer:train(train_data, train_labels, model, criterion)
   model:training()
 
-  local classes = {'1', '2'}
-  local confusion = optim.ConfusionMatrix(classes)
-  local params, grads = model:getParameters()
+  params, grads = model:getParameters()
 
-  local train_size = train_data.data:size(1)
-  local shuffle = torch.randperm(train_size)
+  local train_size = train_data:size(1)
 
   local time = sys.clock()
+  local total_err = 0
 
   for t = 1, train_size, self.batch_size do
-    print('Batch ' .. t)
+    --print('Batch ' .. t)
     -- data samples and labels, in mini batches.
-    local inputs = {}
-    local targets = {}
-    for i = t, math.min(t + self.batch_size - 1, train_size) do
-      local input = train_data.data[shuffle[i]]
-      local target = train_data.labels[shuffle[i]]
-      -- TODO(jeffreyling): use cuda
-      input = input:double()
-      table.insert(inputs, input)
-      table.insert(targets, target)
-    end
+    local batch_size = math.min(self.batch_size, train_size - t + 1)
+    local inputs = train_data:narrow(1, t, batch_size)
+    local targets = train_labels:narrow(1, t, batch_size)
+    inputs = inputs:cuda()
+    targets = targets:cuda()
 
-    -- closure to return f, df/dx
+    -- closure to return err, df/dx
     local func = function(x)
       -- get new parameters
       if x ~= params then
@@ -53,42 +46,30 @@ function trainer:train(train_data, model, criterion)
       -- reset gradients
       grads:zero()
 
-      -- average of all criterions
-      local f = 0
+      -- compute gradients
+      local outputs = model:forward(inputs)
+      local err = criterion:forward(outputs, targets)
 
-      for i = 1,#inputs do
-        -- estimate f
-        local output = model:forward(inputs[i])
-        local err = criterion:forward(output, targets[i])
-        f = f + err
+      local df_do = criterion:backward(outputs, targets)
+      model:backward(inputs, df_do)
 
-        -- estimate df/dw
-        local df_do = criterion:backward(output, targets[i])
-        model:backward(inputs[i], df_do)
-
-        -- update confusion
-        confusion:add(output, targets[i])
-      end
-
-      -- normalize gradients
-      grads:div(#inputs)
-      f = f/#inputs
-
-      return f, grads
+      total_err = total_err + err * batch_size
+      return err, grads
     end
 
     -- gradient descent
     self.optim_method(func, params, self.config, self.state)
 
     -- Renorm (Euclidean projection to L2 ball)
-    local w = model.modules[8].weight -- TODO(jeffreyling): bad constant
+    local w = model.modules[7].weight -- TODO(jeffreyling): bad constant
     local n = w:view(w:size(1)*w:size(2)):norm()
     if (n > self.L2s) then 
       w:div(self.L2s * n)
     end
-
-    print(confusion)
   end
+
+  print(confusion)
+  print('Total err: ' .. total_err / train_size)
 
   -- time taken
   time = sys.clock() - time
@@ -96,15 +77,36 @@ function trainer:train(train_data, model, criterion)
   print("\n==> time to learn 1 sample = " .. (time*1000) .. 'ms')
 end
 
-function trainer:test(test_data)
-  print('==> testing...')
+function Trainer:test(test_data, test_labels, model, criterion)
   model:evaluate()
 
-  --for t = 1, self.test_data:size() do
-    ---- get sample
-    --local input = test_data.data[t]
-    --input = input:double()
-  --end
+  local classes = {'1', '2'}
+  local confusion = optim.ConfusionMatrix(classes)
+  confusion:zero()
+
+  local test_size = test_data:size(1)
+
+  local total_err = 0
+
+  for t = 1, test_size, self.batch_size do
+    -- data samples and labels, in mini batches.
+    local batch_size = math.min(self.batch_size, test_size - t + 1)
+    local inputs = test_data:narrow(1, t, batch_size)
+    local targets = test_labels:narrow(1, t, batch_size)
+    inputs = inputs:cuda()
+    targets = targets:cuda()
+
+    local outputs = model:forward(inputs)
+    local err = criterion:forward(outputs, targets)
+    total_err = total_err + err * batch_size
+
+    for i = 1, batch_size do
+      confusion:add(outputs[i], targets[i])
+    end
+  end
+
+  print(confusion)
+  print('Total err: ' .. total_err / test_size)
 end
 
-return trainer
+return Trainer
