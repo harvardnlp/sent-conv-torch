@@ -8,7 +8,7 @@ local filt_size = 3
 local num_classes = 2
 local dropout_p = 0.5
 
-local vocab_size = 10000 -- TODO(jeffreyling): find vocab size of word2vec
+local vocab_size = 21420 -- TODO(jeffreyling): find vocab size of word2vec
 local vec_size = 300 -- word2vec vector size
 
 local model = nn.Sequential()

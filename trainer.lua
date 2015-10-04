@@ -1,43 +1,41 @@
+require 'nn'
 require 'optim'
 require 'sys'
 
 local trainer = torch.class('trainer')
 
 function trainer:__init()
-  self.model = require 'model'
-  self.train_data, self.test_data = require 'data'
-
-  self.criterion = nn.ClassNLLCriterion()
   self.optim_method = optim.adadelta
-  -- TODO(jeffreyling): Figure out what goes in state.
-  self.training_state = {
-    learningRate = 1e-3,
-    paramVariance = 0.5
+  self.config = {
+    eps = 1e-10
   }
+  self.state = {}
   self.L2s = 3
 
   self.batch_size = 50
-  self.model_type = 'static'
+  model_type = 'static'
 end
 
-function trainer:train()
-  print('==> training net...')
-  self.model:training()
+-- Perform one epoch of training.
+function trainer:train(train_data, model, criterion)
+  print('==> training epoch...')
+  model:training()
+
+  local classes = {'1', '2'}
+  local confusion = optim.ConfusionMatrix(classes)
+  local params, grads = model:getParameters()
+
+  local train_size = train_data.data:size(1)
+  local shuffle = torch.randperm(train_size)
 
   local time = sys.clock()
-  params, grads = self.model:getParameters()
 
-  shuffle = torch.randperm(self.train_data:size(1))
-
-  -- do one epoch
-  epoch = epoch or 1
-  print('==> epoch #' .. epoch .. ' on training data')
-
-  for t = 1, self.train_data:size(1), self.batch_size do
+  for t = 1, train_size, self.batch_size do
+    print('Batch ' .. t)
     -- data samples and labels, in mini batches.
     local inputs = {}
     local targets = {}
-    for i = t,math.min(t+self.batch_size-1, train_size) do
+    for i = t, math.min(t + self.batch_size - 1, train_size) do
       local input = train_data.data[shuffle[i]]
       local target = train_data.labels[shuffle[i]]
       -- TODO(jeffreyling): use cuda
@@ -60,13 +58,16 @@ function trainer:train()
 
       for i = 1,#inputs do
         -- estimate f
-        local output = self.model:forward(inputs[i])
-        local err = self.criterion:forward(output, targets[i])
+        local output = model:forward(inputs[i])
+        local err = criterion:forward(output, targets[i])
         f = f + err
 
         -- estimate df/dw
         local df_do = criterion:backward(output, targets[i])
         model:backward(inputs[i], df_do)
+
+        -- update confusion
+        confusion:add(output, targets[i])
       end
 
       -- normalize gradients
@@ -77,25 +78,33 @@ function trainer:train()
     end
 
     -- gradient descent
-    self.optim_method(func, params, self.training_state)
+    self.optim_method(func, params, self.config, self.state)
 
     -- Renorm (Euclidean projection to L2 ball)
-    local n = params:view(params:size(1)*params:size(2)):norm()
+    local w = model.modules[8].weight -- TODO(jeffreyling): bad constant
+    local n = w:view(w:size(1)*w:size(2)):norm()
     if (n > self.L2s) then 
-      params:div(self.L2s * n)
+      w:div(self.L2s * n)
     end
+
+    print(confusion)
   end
 
   -- time taken
   time = sys.clock() - time
-  time = time / train_data:size(1)
+  time = time / train_size
   print("\n==> time to learn 1 sample = " .. (time*1000) .. 'ms')
 end
 
-function trainer:evaluate()
-  print('==> testing net on sample...')
-  self.model:evaluate()
-  self.model:forward(sentence)
+function trainer:test(test_data)
+  print('==> testing...')
+  model:evaluate()
+
+  --for t = 1, self.test_data:size() do
+    ---- get sample
+    --local input = test_data.data[t]
+    --input = input:double()
+  --end
 end
 
 return trainer

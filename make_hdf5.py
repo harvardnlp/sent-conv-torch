@@ -50,4 +50,5 @@ with h5py.File("rt-polarity.hdf5", "w") as f:
     f["train"] = np.array(pos_data + neg_data, dtype=np.int32)
     f["train_label"] = np.array(labels)
 
+print 'Vocab size:', len(word_to_idx)
 # TODO(jeffreyling): Need to write word_to_idx
