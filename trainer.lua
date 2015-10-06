@@ -12,7 +12,7 @@ function Trainer.init_cmd(cmd)
 end
 
 -- Perform one epoch of training.
-function Trainer:train(train_data, train_labels, model, criterion, optim_method, opts)
+function Trainer:train(train_data, train_labels, model, criterion, optim_method, linear, opts)
   model:training()
 
   params, grads = model:getParameters()
@@ -55,7 +55,7 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
     optim_method(func, params, {}, {})
 
     -- Renorm (Euclidean projection to L2 ball)
-    local w = model.modules[7].weight -- TODO(jeffreyling): bad constant
+    local w = linear.weight -- TODO(jeffreyling): bad constant
     local n = w:view(w:size(1)*w:size(2)):norm()
     if (n > opts.L2s) then 
       w:mul(opts.L2s):div(n)
@@ -66,8 +66,8 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
 
   -- time taken
   time = sys.clock() - time
-  time = time / train_size
-  print("\n==> time to learn 1 sample = " .. (time*1000) .. 'ms')
+  time = self.batch_size * time / train_size
+  print("\n==> time to learn 1 batch = " .. (time*1000) .. 'ms')
 end
 
 function Trainer:test(test_data, test_labels, model, criterion, opts)
