@@ -3,25 +3,31 @@ require 'nn'
 require 'fbcunn'
 require 'cunn'
 
--- Hyperparameters
-local num_channels = 1
-local num_feat_maps = 100 -- Number of feature maps after 1st convolution.
-local filt_size = 3
-local num_classes = 2
-local dropout_p = 0.5
+local ModelBuilder = torch.class('ModelBuilder')
 
-local vocab_size = 21421 -- TODO(jeffreyling): find vocab size of word2vec
-local vec_size = 300 -- word2vec vector size
+function ModelBuilder.init_cmd(cmd)
+  cmd:option('-vocab_size', 21421, 'Vocab size')
+  cmd:option('-vec_size', 300, 'word2vec vector size')
 
-local model = nn.Sequential()
-model:add(nn.LookupTable(vocab_size, vec_size)) -- LookupTable for word2vec
-model:add(nn.TemporalConvolution(vec_size, num_feat_maps, filt_size))
-model:add(nn.ReLU())
-model:add(nn.Transpose({2,3})) -- swap feature maps and time
-model:add(nn.Max(3)) -- max over time
+  cmd:option('-num_feat_maps', 100, 'Number of feature maps after 1st convolution')
+  cmd:option('-kernel_size', 3, 'Kernel size of convolution')
+  cmd:option('-dropout_p', 0.5, 'p for dropout')
+  cmd:option('-num_classes', 2, 'Number of output classes')
+end
 
-model:add(nn.Dropout(dropout_p))
-model:add(nn.Linear(num_feat_maps, num_classes))
-model:add(nn.LogSoftMax())
+function ModelBuilder:make_net(opts)
+  local model = nn.Sequential()
+  model:add(nn.LookupTable(opts.vocab_size, opts.vec_size)) -- LookupTable for word2vec
+  model:add(nn.TemporalConvolution(opts.vec_size, opts.num_feat_maps, opts.kernel_size))
+  model:add(nn.ReLU())
+  model:add(nn.Transpose({2,3})) -- swap feature maps and time
+  model:add(nn.Max(3)) -- max over time
 
-return model
+  model:add(nn.Dropout(opts.dropout_p))
+  model:add(nn.Linear(opts.num_feat_maps, opts.num_classes))
+  model:add(nn.LogSoftMax())
+
+  return model
+end
+
+return ModelBuilder

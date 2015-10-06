@@ -1,22 +1,18 @@
 require 'nn'
-require 'optim'
 require 'sys'
 require 'cutorch'
 require 'torch'
 
 local Trainer = torch.class('Trainer')
 
-function Trainer:__init()
-  self.optim_method = optim.adadelta
-  self.config = {}
-  self.state = {}
-  self.L2s = 3
-
-  self.batch_size = 50
+function Trainer.init_cmd(cmd)
+  cmd:option('-optim_method', 'adadelta', 'Gradient descent method. Options: adadelta')
+  cmd:option('-L2s', 3, 'L2 normalize weights')
+  cmd:option('-batch_size', 50, 'Batch size for training')
 end
 
 -- Perform one epoch of training.
-function Trainer:train(train_data, train_labels, model, criterion)
+function Trainer:train(train_data, train_labels, model, criterion, optim_method, opts)
   model:training()
 
   params, grads = model:getParameters()
@@ -26,10 +22,10 @@ function Trainer:train(train_data, train_labels, model, criterion)
   local time = sys.clock()
   local total_err = 0
 
-  for t = 1, train_size, self.batch_size do
+  for t = 1, train_size, opts.batch_size do
     --print('Batch ' .. t)
     -- data samples and labels, in mini batches.
-    local batch_size = math.min(self.batch_size, train_size - t + 1)
+    local batch_size = math.min(opts.batch_size, train_size - t + 1)
     local inputs = train_data:narrow(1, t, batch_size)
     local targets = train_labels:narrow(1, t, batch_size)
     inputs = inputs:cuda()
@@ -56,13 +52,13 @@ function Trainer:train(train_data, train_labels, model, criterion)
     end
 
     -- gradient descent
-    self.optim_method(func, params, self.config, self.state)
+    optim_method(func, params, {}, {})
 
     -- Renorm (Euclidean projection to L2 ball)
     local w = model.modules[7].weight -- TODO(jeffreyling): bad constant
     local n = w:view(w:size(1)*w:size(2)):norm()
-    if (n > self.L2s) then 
-      w:mul(self.L2s):div(n)
+    if (n > opts.L2s) then 
+      w:mul(opts.L2s):div(n)
     end
   end
 
@@ -74,7 +70,7 @@ function Trainer:train(train_data, train_labels, model, criterion)
   print("\n==> time to learn 1 sample = " .. (time*1000) .. 'ms')
 end
 
-function Trainer:test(test_data, test_labels, model, criterion)
+function Trainer:test(test_data, test_labels, model, criterion, opts)
   model:evaluate()
 
   local classes = {'1', '2'}
@@ -85,9 +81,9 @@ function Trainer:test(test_data, test_labels, model, criterion)
 
   local total_err = 0
 
-  for t = 1, test_size, self.batch_size do
+  for t = 1, test_size, opts.batch_size do
     -- data samples and labels, in mini batches.
-    local batch_size = math.min(self.batch_size, test_size - t + 1)
+    local batch_size = math.min(opts.batch_size, test_size - t + 1)
     local inputs = test_data:narrow(1, t, batch_size)
     local targets = test_labels:narrow(1, t, batch_size)
     inputs = inputs:cuda()
