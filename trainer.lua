@@ -2,19 +2,17 @@ require 'nn'
 require 'optim'
 require 'sys'
 require 'cutorch'
+require 'torch'
 
 local Trainer = torch.class('Trainer')
 
 function Trainer:__init()
   self.optim_method = optim.adadelta
-  self.config = {
-    eps = 1e-10
-  }
+  self.config = {}
   self.state = {}
   self.L2s = 3
 
   self.batch_size = 50
-  model_type = 'static'
 end
 
 -- Perform one epoch of training.
@@ -64,11 +62,10 @@ function Trainer:train(train_data, train_labels, model, criterion)
     local w = model.modules[7].weight -- TODO(jeffreyling): bad constant
     local n = w:view(w:size(1)*w:size(2)):norm()
     if (n > self.L2s) then 
-      w:div(self.L2s * n)
+      w:mul(self.L2s):div(n)
     end
   end
 
-  print(confusion)
   print('Total err: ' .. total_err / train_size)
 
   -- time taken

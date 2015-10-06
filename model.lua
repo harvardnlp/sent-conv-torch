@@ -22,7 +22,6 @@ model:add(nn.Max(3)) -- max over time
 
 model:add(nn.Dropout(dropout_p))
 model:add(nn.Linear(num_feat_maps, num_classes))
-model:add(nn.ReLU())
 model:add(nn.LogSoftMax())
 
 return model

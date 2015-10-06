@@ -27,4 +27,6 @@ for epoch = 1, 10 do
 
   print('==> evaluate...')
   trainer:test(train, train_label, model, criterion)
+
+  print('\n')
 end
