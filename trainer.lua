@@ -55,7 +55,7 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
     optim_method(func, params, {}, {})
 
     -- Renorm (Euclidean projection to L2 ball)
-    local w = linear.weight -- TODO(jeffreyling): bad constant
+    local w = linear.weight
     local n = w:view(w:size(1)*w:size(2)):norm()
     if (n > opts.L2s) then 
       w:mul(opts.L2s):div(n)
@@ -66,7 +66,7 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
 
   -- time taken
   time = sys.clock() - time
-  time = self.batch_size * time / train_size
+  time = opts.batch_size * time / train_size
   print("\n==> time to learn 1 batch = " .. (time*1000) .. 'ms')
 end
 

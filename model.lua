@@ -16,10 +16,16 @@ function ModelBuilder.init_cmd(cmd)
   cmd:option('-num_classes', 2, 'Number of output classes')
 end
 
-function ModelBuilder:make_net(opts)
+function ModelBuilder:make_net(w2v, opts)
   self.model = nn.Sequential()
   local model = self.model
-  model:add(nn.LookupTable(opts.vocab_size, opts.vec_size)) -- LookupTable for word2vec
+
+  local lookup = nn.LookupTable(opts.vocab_size, opts.vec_size)
+  if opts.model_type == 'static' or opts.model == 'nonstatic' then
+    lookup.weights = w2v
+  end
+  model:add(lookup)
+    
   --model:add(nn.TemporalConvolution(opts.vec_size, opts.num_feat_maps, opts.kernel_size))
   --model:add(nn.TemporalConvolutionFB(opts.vec_size, opts.num_feat_maps, opts.kernel_size))
 
@@ -41,11 +47,23 @@ function ModelBuilder:make_net(opts)
 end
 
 function ModelBuilder:get_linear()
+  if not self.model then return end
+
   for i = 1, #self.model do
     if torch.typename(self.model.modules[i]) == 'nn.Linear' then
       return self.model.modules[i]
     end
   end
+end
+
+function ModelBuilder:set_w2v_weights(w)
+  --pass
+  for i = 1, #self.model do
+    if torch.typename(self.model.modules[i]) == 'nn.LookupTable' then
+      -- pass
+    end
+  end
+
 end
 
 return ModelBuilder
