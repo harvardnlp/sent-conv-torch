@@ -1,4 +1,3 @@
-require 'cutorch'
 require 'hdf5'
 require 'nn'
 require 'optim'
@@ -18,6 +17,8 @@ cmd:text('Options')
 cmd:option('-num_epochs', 10, 'Number of training epochs')
 cmd:option('-model_type', 'rand', 'Model type. Options: rand (randomly initialized word embeddings), static (pre-trained embeddings from word2vec, static during learning), nonstatic (pre-trained embeddings, tuned during learning), multichannel')
 cmd:option('-data', 'data.hdf5', 'Training data and word2vec data')
+cmd:option('-cudnn', 1, 'Use cudnn and GPUs if set to 1, otherwise set to 0')
+
 trainer.init_cmd(cmd)
 model_builder.init_cmd(cmd)
 cmd:text()
@@ -48,8 +49,10 @@ if opts.optim_method == 'adadelta' then
 end
 
 -- move to GPU
-model:cuda()
-criterion:cuda()
+if opts.cudnn == 1 then
+  model:cuda()
+  criterion:cuda()
+end
 
 -- Training loop.
 for epoch = 1, opts.num_epochs do

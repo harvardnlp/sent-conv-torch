@@ -1,6 +1,5 @@
 require 'nn'
 require 'sys'
-require 'cutorch'
 require 'torch'
 
 local Trainer = torch.class('Trainer')
@@ -29,8 +28,13 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
     local batch_size = math.min(opts.batch_size, train_size - t + 1)
     local inputs = train_data:narrow(1, t, batch_size)
     local targets = train_labels:narrow(1, t, batch_size)
-    inputs = inputs:cuda()
-    targets = targets:cuda()
+    if opts.cudnn == 1 then
+      inputs = inputs:cuda()
+      targets = targets:cuda()
+    else
+      inputs = inputs:double()
+      targets = targets:double()
+    end
 
     -- closure to return err, df/dx
     local func = function(x)
@@ -92,8 +96,13 @@ function Trainer:test(test_data, test_labels, model, criterion, opts)
     local batch_size = math.min(opts.batch_size, test_size - t + 1)
     local inputs = test_data:narrow(1, t, batch_size)
     local targets = test_labels:narrow(1, t, batch_size)
-    inputs = inputs:cuda()
-    targets = targets:cuda()
+    if opts.cudnn == 1 then
+      inputs = inputs:cuda()
+      targets = targets:cuda()
+    else
+      inputs = inputs:double()
+      targets = targets:double()
+    end
 
     local outputs = model:forward(inputs)
     local err = criterion:forward(outputs, targets)
