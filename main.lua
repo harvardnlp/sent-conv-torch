@@ -26,13 +26,19 @@ cmd:text()
 local opts = cmd:parse(arg)
 
 -- Read HDF5 training data
+print('loading data...')
 local f = hdf5.open(opts.data, 'r')
 local train = f:read('train'):all()
 local train_label = f:read('train_label'):all()
 local w2v = f:read('w2v'):all()
+print('data loaded!')
 
+-- build model
 local model = model_builder:make_net(w2v, opts)
 local linear = model_builder:get_linear()
+local w2v = model_builder:get_w2v()
+local layers = {linear = linear, w2v = w2v}
+
 local criterion = nn.ClassNLLCriterion()
 
 -- Currently only adadelta allowed
@@ -53,7 +59,7 @@ for epoch = 1, opts.num_epochs do
   train_label = train_label:index(1, shuffle:long())
 
   print('==> training epoch ' .. epoch)
-  trainer:train(train, train_label, model, criterion, optim_method, linear, opts)
+  trainer:train(train, train_label, model, criterion, optim_method, layers, opts)
 
   print('==> evaluate...')
   trainer:test(train, train_label, model, criterion, opts)

@@ -12,10 +12,11 @@ function Trainer.init_cmd(cmd)
 end
 
 -- Perform one epoch of training.
-function Trainer:train(train_data, train_labels, model, criterion, optim_method, linear, opts)
+function Trainer:train(train_data, train_labels, model, criterion, optim_method, layers, opts)
   model:training()
 
   params, grads = model:getParameters()
+  _, w2v_grads = layers.w2v:getParameters()
 
   local train_size = train_data:size(1)
 
@@ -47,6 +48,11 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
       local df_do = criterion:backward(outputs, targets)
       model:backward(inputs, df_do)
 
+      if opts.model_type == 'static' then
+        -- don't update embeddings for static model
+        w2v_grads:zero()
+      end
+
       total_err = total_err + err * batch_size
       return err, grads
     end
@@ -55,7 +61,7 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
     optim_method(func, params, {}, {})
 
     -- Renorm (Euclidean projection to L2 ball)
-    local w = linear.weight
+    local w = layers.linear.weight
     local n = w:view(w:size(1)*w:size(2)):norm()
     if (n > opts.L2s) then 
       w:mul(opts.L2s):div(n)

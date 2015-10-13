@@ -56,14 +56,14 @@ function ModelBuilder:get_linear()
   end
 end
 
-function ModelBuilder:set_w2v_weights(w)
-  --pass
+function ModelBuilder:get_w2v()
+  if not self.model then return end
+
   for i = 1, #self.model do
     if torch.typename(self.model.modules[i]) == 'nn.LookupTable' then
-      -- pass
+      return self.model.modules[i]
     end
   end
-
 end
 
 return ModelBuilder
