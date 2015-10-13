@@ -1,8 +1,5 @@
 require 'torch'
 require 'nn'
-require 'fbcunn'
-require 'cunn'
-require 'cudnn'
 
 local ModelBuilder = torch.class('ModelBuilder')
 
@@ -26,22 +23,30 @@ function ModelBuilder:make_net(w2v, opts)
   end
   model:add(lookup)
     
-  --model:add(nn.TemporalConvolution(opts.vec_size, opts.num_feat_maps, opts.kernel_size))
-  --model:add(nn.TemporalConvolutionFB(opts.vec_size, opts.num_feat_maps, opts.kernel_size))
-
-  -- Reshape for spatial convolution
-  model:add(nn.Reshape(1, -1, opts.vec_size, true))
-  model:add(cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, opts.kernel_size))
-  model:add(nn.Reshape(opts.num_feat_maps, -1, true))
-  model:add(nn.Max(3))
-
-  model:add(cudnn.ReLU())
-  --model:add(nn.Transpose({2,3})) -- swap feature maps and time
-  --model:add(nn.Max(3)) -- max over time
+  if opts.cudnn == 1 then
+    require 'cudnn'
+    -- Reshape for spatial convolution
+    model:add(nn.Reshape(1, -1, opts.vec_size, true))
+    model:add(cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, opts.kernel_size))
+    model:add(nn.Reshape(opts.num_feat_maps, -1, true))
+    model:add(nn.Max(3))
+    model:add(cudnn.ReLU())
+  else
+    model:add(nn.TemporalConvolution(opts.vec_size, opts.num_feat_maps, opts.kernel_size))
+    --model:add(nn.TemporalConvolutionFB(opts.vec_size, opts.num_feat_maps, opts.kernel_size))
+    model:add(nn.ReLU())
+    model:add(nn.Transpose({2,3})) -- swap feature maps and time
+    model:add(nn.Max(3)) -- max over time
+  end
 
   model:add(nn.Dropout(opts.dropout_p))
   model:add(nn.Linear(opts.num_feat_maps, opts.num_classes))
-  model:add(cudnn.LogSoftMax())
+  
+  if opts.cudnn == 1 then
+    model:add(cudnn.LogSoftMax())
+  else
+    model:add(nn.LogSoftMax())
+  end
 
   return self.model
 end
@@ -54,16 +59,6 @@ function ModelBuilder:get_linear()
       return self.model.modules[i]
     end
   end
-end
-
-function ModelBuilder:set_w2v_weights(w)
-  --pass
-  for i = 1, #self.model do
-    if torch.typename(self.model.modules[i]) == 'nn.LookupTable' then
-      -- pass
-    end
-  end
-
 end
 
 return ModelBuilder
