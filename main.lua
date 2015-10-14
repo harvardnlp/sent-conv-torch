@@ -36,22 +36,25 @@ print('data loaded!')
 
 -- build model
 local model = model_builder:make_net(w2v, opts)
+
+local criterion = nn.ClassNLLCriterion()
+
+-- move to GPU
+if opts.cudnn == 1 then
+  require 'cutorch'
+  model:cuda()
+  criterion:cuda()
+end
+
+-- get layers
 local linear = model_builder:get_linear()
 local w2v = model_builder:get_w2v()
 local layers = {linear = linear, w2v = w2v}
-
-local criterion = nn.ClassNLLCriterion()
 
 -- Currently only adadelta allowed
 local optim_method = optim.adadelta
 if opts.optim_method == 'adadelta' then
   optim_method = optim.adadelta
-end
-
--- move to GPU
-if opts.cudnn == 1 then
-  model:cuda()
-  criterion:cuda()
 end
 
 -- Training loop.

@@ -19,12 +19,13 @@ function ModelBuilder:make_net(w2v, opts)
 
   local lookup = nn.LookupTable(opts.vocab_size, opts.vec_size)
   if opts.model_type == 'static' or opts.model == 'nonstatic' then
-    lookup.weights = w2v
+    lookup.weight = w2v
   end
   model:add(lookup)
     
   if opts.cudnn == 1 then
     require 'cudnn'
+    require 'cunn'
     -- Reshape for spatial convolution
     model:add(nn.Reshape(1, -1, opts.vec_size, true))
     model:add(cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, opts.kernel_size))
@@ -35,8 +36,8 @@ function ModelBuilder:make_net(w2v, opts)
     model:add(nn.TemporalConvolution(opts.vec_size, opts.num_feat_maps, opts.kernel_size))
     --model:add(nn.TemporalConvolutionFB(opts.vec_size, opts.num_feat_maps, opts.kernel_size))
     model:add(nn.ReLU())
-    model:add(nn.Transpose({2,3})) -- swap feature maps and time
-    model:add(nn.Max(3)) -- max over time
+    --model:add(nn.Transpose({2,3})) -- swap feature maps and time
+    model:add(nn.Max(2)) -- max over time
   end
 
   model:add(nn.Dropout(opts.dropout_p))
