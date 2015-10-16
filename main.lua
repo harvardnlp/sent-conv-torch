@@ -18,6 +18,7 @@ cmd:option('-num_epochs', 10, 'Number of training epochs')
 cmd:option('-model_type', 'rand', 'Model type. Options: rand (randomly initialized word embeddings), static (pre-trained embeddings from word2vec, static during learning), nonstatic (pre-trained embeddings, tuned during learning), multichannel (TODO)')
 cmd:option('-data', 'data.hdf5', 'Training data and word2vec data')
 cmd:option('-cudnn', 1, 'Use cudnn and GPUs if set to 1, otherwise set to 0')
+cmd:option('-seed', 35392, 'random seed')
 
 trainer.init_cmd(cmd)
 model_builder.init_cmd(cmd)
@@ -25,6 +26,7 @@ cmd:text()
 
 -- parse arguments
 local opts = cmd:parse(arg)
+torch.manualSeed(opts.seed)
 
 -- Read HDF5 training data
 print('loading data...')
@@ -84,6 +86,7 @@ for epoch = 1, opts.num_epochs do
   print('==> training epoch ' .. epoch)
   trainer:train(train, train_label, model, criterion, optim_method, layers, opts)
 
+  print('\n')
   print('==> evaluate...')
   trainer:test(dev, dev_label, model, criterion, opts)
 

@@ -78,7 +78,7 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
   -- time taken
   time = sys.clock() - time
   time = opts.batch_size * time / train_size
-  print("\n==> time to learn 1 batch = " .. (time*1000) .. 'ms')
+  print("==> time to learn 1 batch = " .. (time*1000) .. 'ms')
 end
 
 function Trainer:test(test_data, test_labels, model, criterion, opts)
