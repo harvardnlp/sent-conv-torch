@@ -15,7 +15,7 @@ cmd:text('Convolutional net for sentence classification')
 cmd:text()
 cmd:text('Options')
 cmd:option('-num_epochs', 10, 'Number of training epochs')
-cmd:option('-model_type', 'rand', 'Model type. Options: rand (randomly initialized word embeddings), static (pre-trained embeddings from word2vec, static during learning), nonstatic (pre-trained embeddings, tuned during learning), multichannel')
+cmd:option('-model_type', 'rand', 'Model type. Options: rand (randomly initialized word embeddings), static (pre-trained embeddings from word2vec, static during learning), nonstatic (pre-trained embeddings, tuned during learning), multichannel (TODO)')
 cmd:option('-data', 'data.hdf5', 'Training data and word2vec data')
 cmd:option('-cudnn', 1, 'Use cudnn and GPUs if set to 1, otherwise set to 0')
 
@@ -29,8 +29,8 @@ local opts = cmd:parse(arg)
 -- Read HDF5 training data
 print('loading data...')
 local f = hdf5.open(opts.data, 'r')
-local train = f:read('train'):all()
-local train_label = f:read('train_label'):all()
+local X = f:read('train'):all()
+local y = f:read('train_label'):all()
 local w2v = f:read('w2v'):all()
 print('data loaded!')
 
@@ -57,6 +57,23 @@ if opts.optim_method == 'adadelta' then
   optim_method = optim.adadelta
 end
 
+-- split data: 80/10/10 train/dev/test
+local N = X:size(1)
+local shuffle = torch.randperm(N)
+X = X:index(1, shuffle:long())
+y = y:index(1, shuffle:long())
+
+local train_sz = math.floor(0.8*N)
+local test_sz = math.floor(0.1*N)
+local train = X:narrow(1, 1, train_sz)
+local train_label = y:narrow(1, 1, train_sz)
+local dev = X:narrow(1, train_sz + 1, test_sz)
+local dev_label = y:narrow(1, train_sz + 1, test_sz)
+local test = X:narrow(1, train_sz + test_sz + 1, test_sz)
+local test_label = y:narrow(1, train_sz + test_sz + 1, test_sz)
+print(train_label:size(), dev_label:size())
+print(test_label:size())
+
 -- Training loop.
 for epoch = 1, opts.num_epochs do
   -- shuffle data
@@ -68,7 +85,10 @@ for epoch = 1, opts.num_epochs do
   trainer:train(train, train_label, model, criterion, optim_method, layers, opts)
 
   print('==> evaluate...')
-  trainer:test(train, train_label, model, criterion, opts)
+  trainer:test(dev, dev_label, model, criterion, opts)
 
   print('\n')
 end
+
+print('==> final test')
+trainer:test(test, test_label, model, criterion, opts)
