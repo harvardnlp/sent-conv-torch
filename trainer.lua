@@ -49,8 +49,6 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
       end
       -- reset gradients
       grads:zero()
-      -- padding embedding is zero
-      layers.w2v.weight[1]:zero()
 
       -- compute gradients
       local outputs = model:forward(inputs)
@@ -74,6 +72,8 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
 
     -- gradient descent
     optim_method(func, params, config)
+    -- reset padding embedding to zero
+    layers.w2v.weight[1]:zero()
 
     -- Renorm (Euclidean projection to L2 ball)
     local w = layers.linear.weight
