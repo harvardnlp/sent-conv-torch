@@ -21,6 +21,8 @@ function ModelBuilder:make_net(w2v, opts)
   if opts.model_type == 'static' or opts.model == 'nonstatic' then
     lookup.weight = w2v
   end
+  -- padding should always be 0
+  lookup.weight[1]:zero()
   model:add(lookup)
     
   if opts.cudnn == 1 then
@@ -31,10 +33,12 @@ function ModelBuilder:make_net(w2v, opts)
     model:add(cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, opts.kernel_size))
     model:add(nn.Reshape(opts.num_feat_maps, -1, true))
     model:add(nn.Max(3))
+    --model:add(nn.TemporalConvolutionFB(opts.vec_size, opts.num_feat_maps, opts.kernel_size))
+    --model:add(nn.Transpose({2,3})) -- swap feature maps and time
+    --model:add(nn.Max(3)) -- max over time
     model:add(cudnn.ReLU())
   else
     model:add(nn.TemporalConvolution(opts.vec_size, opts.num_feat_maps, opts.kernel_size))
-    --model:add(nn.TemporalConvolutionFB(opts.vec_size, opts.num_feat_maps, opts.kernel_size))
     model:add(nn.ReLU())
     --model:add(nn.Transpose({2,3})) -- swap feature maps and time
     model:add(nn.Max(2)) -- max over time

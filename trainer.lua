@@ -22,7 +22,11 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
   local time = sys.clock()
   local total_err = 0
 
-  local config = {} -- for optim
+  local classes = {'1', '2'}
+  local confusion = optim.ConfusionMatrix(classes)
+  confusion:zero()
+
+  local config = { rho = 0.95 } -- for optim
   for t = 1, train_size, opts.batch_size do
     --print('Batch ' .. t)
     -- data samples and labels, in mini batches.
@@ -45,6 +49,8 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
       end
       -- reset gradients
       grads:zero()
+      -- padding embedding is zero
+      layers.w2v.weight[1]:zero()
 
       -- compute gradients
       local outputs = model:forward(inputs)
@@ -59,6 +65,10 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
       end
 
       total_err = total_err + err * batch_size
+      for i = 1, batch_size do
+        confusion:add(outputs[i], targets[i])
+      end
+
       return err, grads
     end
 
@@ -74,6 +84,7 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
   end
 
   print('Total err: ' .. total_err / train_size)
+  print(confusion)
 
   -- time taken
   time = sys.clock() - time

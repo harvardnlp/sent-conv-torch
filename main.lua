@@ -31,8 +31,12 @@ torch.manualSeed(opts.seed)
 -- Read HDF5 training data
 print('loading data...')
 local f = hdf5.open(opts.data, 'r')
-local X = f:read('train'):all()
-local y = f:read('train_label'):all()
+local train = f:read('train'):all()
+local train_label = f:read('train_label'):all()
+local dev = f:read('dev'):all()
+local dev_label = f:read('dev_label'):all()
+local test = f:read('test'):all()
+local test_label = f:read('test_label'):all()
 local w2v = f:read('w2v'):all()
 print('data loaded!')
 
@@ -58,23 +62,6 @@ local optim_method = optim.adadelta
 if opts.optim_method == 'adadelta' then
   optim_method = optim.adadelta
 end
-
--- split data: 80/10/10 train/dev/test
-local N = X:size(1)
-local shuffle = torch.randperm(N)
-X = X:index(1, shuffle:long())
-y = y:index(1, shuffle:long())
-
-local train_sz = math.floor(0.8*N)
-local test_sz = math.floor(0.1*N)
-local train = X:narrow(1, 1, train_sz)
-local train_label = y:narrow(1, 1, train_sz)
-local dev = X:narrow(1, train_sz + 1, test_sz)
-local dev_label = y:narrow(1, train_sz + 1, test_sz)
-local test = X:narrow(1, train_sz + test_sz + 1, test_sz)
-local test_label = y:narrow(1, train_sz + test_sz + 1, test_sz)
-print(train_label:size(), dev_label:size())
-print(test_label:size())
 
 -- Training loop.
 for epoch = 1, opts.num_epochs do
