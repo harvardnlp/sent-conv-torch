@@ -74,7 +74,7 @@ def load_data(pos_fname, neg_fname):
   pos_file.close()
   neg_file.close()
 
-  return pos_data + neg_data, labels, word_to_idx
+  return np.array(pos_data + neg_data, dtype=np.int32), np.array(labels, np.int32), word_to_idx
 
 if __name__ == '__main__':
   data, labels, word_to_idx = load_data("rt-polarity.pos", "rt-polarity.neg")
@@ -89,7 +89,19 @@ if __name__ == '__main__':
   for word, vec in w2v.items():
     embed[word_to_idx[word]] = vec
 
+  N = data.shape[0]
+  print 'data size:', N
+  perm = np.random.permutation(N)
+  data = data[perm]
+  labels = labels[perm]
+
+  i1 = 8*N/10
+  i2 = 9*N/10
   with h5py.File("data.hdf5", "w") as f:
-    f["train"] = np.array(data, dtype=np.int32)
-    f["train_label"] = np.array(labels, dtype=np.int32)
+    f["train"] = data[:i1, ]
+    f["train_label"] = labels[:i1, ]
+    f["dev"] = data[i1:i2, ]
+    f["dev_label"] = labels[i1:i2, ]
+    f["test"] = data[i2: , ]
+    f["test_label"] = labels[i2: , ]
     f["w2v"] = np.array(embed)
