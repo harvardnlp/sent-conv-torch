@@ -40,6 +40,9 @@ local test_label = f:read('test_label'):all()
 local w2v = f:read('w2v'):all()
 print('data loaded!')
 
+opts.vocab_size = w2v:size(1)
+print('vocab size: ' .. opts.vocab_size)
+
 -- build model
 local model = model_builder:make_net(w2v, opts)
 

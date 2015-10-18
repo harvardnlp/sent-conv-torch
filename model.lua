@@ -4,7 +4,7 @@ require 'nn'
 local ModelBuilder = torch.class('ModelBuilder')
 
 function ModelBuilder.init_cmd(cmd)
-  cmd:option('-vocab_size', 21421, 'Vocab size')
+  cmd:option('-vocab_size', 18766, 'Vocab size')
   cmd:option('-vec_size', 300, 'word2vec vector size')
 
   cmd:option('-num_feat_maps', 100, 'Number of feature maps after 1st convolution')
@@ -18,7 +18,7 @@ function ModelBuilder:make_net(w2v, opts)
   local model = self.model
 
   local lookup = nn.LookupTable(opts.vocab_size, opts.vec_size)
-  if opts.model_type == 'static' or opts.model == 'nonstatic' then
+  if opts.model_type == 'static' or opts.model_type == 'nonstatic' then
     lookup.weight = w2v
   end
   -- padding should always be 0
