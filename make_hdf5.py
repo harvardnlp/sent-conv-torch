@@ -121,13 +121,7 @@ if __name__ == '__main__':
   data = data[perm]
   labels = labels[perm]
 
-  i1 = 8*N/10
-  i2 = 9*N/10
   with h5py.File("data.hdf5", "w") as f:
-    f["train"] = data[:i1, ]
-    f["train_label"] = labels[:i1, ]
-    f["dev"] = data[i1:i2, ]
-    f["dev_label"] = labels[i1:i2, ]
-    f["test"] = data[i2: , ]
-    f["test_label"] = labels[i2: , ]
+    f["data"] = data
+    f["data_label"] = labels
     f["w2v"] = np.array(embed)

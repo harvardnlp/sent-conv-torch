@@ -76,11 +76,22 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
     layers.w2v.weight[1]:zero()
 
     -- Renorm (Euclidean projection to L2 ball)
-    local w = layers.linear.weight
-    local n = w:view(w:size(1)*w:size(2)):norm()
-    if (n > opts.L2s) then 
-      w:mul(opts.L2s):div(n)
+    local renorm = function(row)
+      local n = row:norm()
+      if (n > opts.L2s) then
+        row:mul(opts.L2s):div(n)
+      end
     end
+
+    local w = layers.linear.weight
+    for i = 1, w:size(1) do
+      row = w[i]
+      renorm(row)
+    end
+    --local n = w:view(w:size(1)*w:size(2)):norm()
+    --if (n > opts.L2s) then 
+      --w:mul(opts.L2s):div(n)
+    --end
   end
 
   print('Total err: ' .. total_err / train_size)
