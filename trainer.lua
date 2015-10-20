@@ -127,6 +127,9 @@ function Trainer:test(test_data, test_labels, model, criterion, opts)
 
   print(confusion)
   print('Total err: ' .. total_err / test_size)
+
+  -- return error percent
+  return confusion.totalValid
 end
 
 return Trainer

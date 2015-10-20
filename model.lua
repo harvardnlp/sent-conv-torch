@@ -20,18 +20,24 @@ function ModelBuilder:make_net(w2v, opts)
   local lookup = nn.LookupTable(opts.vocab_size, opts.vec_size)
   if opts.model_type == 'static' or opts.model_type == 'nonstatic' then
     lookup.weight = w2v
+  else
+    lookup.weight:uniform(-0.25, 0.25)
   end
   -- padding should always be 0
   lookup.weight[1]:zero()
   model:add(lookup)
-    
+
   if opts.cudnn == 1 then
     require 'cudnn'
     require 'cunn'
     -- Reshape for spatial convolution
     model:add(nn.Reshape(1, -1, opts.vec_size, true))
-    model:add(cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, opts.kernel_size))
+    local conv = cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, opts.kernel_size)
+    conv.weight:uniform(-0.01, 0.01)
+    conv.bias:zero()
+    model:add(conv)
     model:add(nn.Reshape(opts.num_feat_maps, -1, true))
+
     model:add(nn.Max(3))
     --model:add(nn.TemporalConvolutionFB(opts.vec_size, opts.num_feat_maps, opts.kernel_size))
     --model:add(nn.Transpose({2,3})) -- swap feature maps and time
@@ -45,8 +51,11 @@ function ModelBuilder:make_net(w2v, opts)
   end
 
   model:add(nn.Dropout(opts.dropout_p))
-  model:add(nn.Linear(opts.num_feat_maps, opts.num_classes))
-  
+  local linear = nn.Linear(opts.num_feat_maps, opts.num_classes)
+  linear.weight:uniform(-0.01, 0.01)
+  linear.bias:zero()
+  model:add(linear)
+
   if opts.cudnn == 1 then
     model:add(cudnn.LogSoftMax())
   else
