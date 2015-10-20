@@ -67,6 +67,9 @@ if opts.optim_method == 'adadelta' then
 end
 
 -- Training loop.
+local best_model = model:clone()
+local best_epoch = 1
+local best_err = 0.0
 for epoch = 1, opts.num_epochs do
   -- shuffle data
   local shuffle = torch.randperm(train:size(1))
@@ -78,10 +81,18 @@ for epoch = 1, opts.num_epochs do
 
   print('\n')
   print('==> evaluate...')
-  trainer:test(dev, dev_label, model, criterion, opts)
+  local err_rate = trainer:test(dev, dev_label, model, criterion, opts)
+  if err_rate > best_err then
+    best_model = model:clone()
+    best_epoch = epoch
+    best_err = err_rate
+  end
 
   print('\n')
 end
 
+print('best epoch: ' .. best_epoch)
+print('best dev err: ' .. best_err .. '%')
+print('\n')
 print('==> final test')
-trainer:test(test, test_label, model, criterion, opts)
+trainer:test(test, test_label, best_model, criterion, opts)
