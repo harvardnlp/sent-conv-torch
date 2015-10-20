@@ -14,10 +14,10 @@ cmd:text()
 cmd:text('Convolutional net for sentence classification')
 cmd:text()
 cmd:text('Options')
-cmd:option('-num_epochs', 10, 'Number of training epochs')
+cmd:option('-num_epochs', 25, 'Number of training epochs')
 cmd:option('-model_type', 'rand', 'Model type. Options: rand (randomly initialized word embeddings), static (pre-trained embeddings from word2vec, static during learning), nonstatic (pre-trained embeddings, tuned during learning), multichannel (TODO)')
 cmd:option('-data', 'data.hdf5', 'Training data and word2vec data')
-cmd:option('-cudnn', 1, 'Use cudnn and GPUs if set to 1, otherwise set to 0')
+cmd:option('-cudnn', 0, 'Use cudnn and GPUs if set to 1, otherwise set to 0')
 cmd:option('-seed', 35392, 'random seed')
 
 trainer.init_cmd(cmd)
@@ -41,6 +41,13 @@ local data = f:read('data'):all()
 local data_label = f:read('data_label'):all()
 local w2v = f:read('w2v'):all()
 print('data loaded!')
+
+-- Zero-pad at start
+local max_filt_sz = 3 -- this should depend on filter size
+local tmp_data = torch.ones(data:size(1), data:size(2) + max_filt_sz - 1)
+tmp_data[{{}, {max_filt_sz,tmp_data:size(2)}}]:copy(data)
+data = tmp_data
+collectgarbage()
 
 opts.vocab_size = w2v:size(1)
 print('vocab size: ' .. opts.vocab_size)
@@ -80,6 +87,7 @@ for fold = 1, 10 do
   -- move to GPU
   if opts.cudnn == 1 then
     require 'cutorch'
+    cutorch.setDevice(0)
     model:cuda()
     criterion:cuda()
   end

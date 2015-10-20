@@ -26,15 +26,14 @@ function ModelBuilder:make_net(w2v, opts)
   -- padding should always be 0
   lookup.weight[1]:zero()
   model:add(lookup)
-
+  
+  local conv
   if opts.cudnn == 1 then
     require 'cudnn'
     require 'cunn'
     -- Reshape for spatial convolution
     model:add(nn.Reshape(1, -1, opts.vec_size, true))
-    local conv = cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, opts.kernel_size)
-    conv.weight:uniform(-0.01, 0.01)
-    conv.bias:zero()
+    conv = cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, opts.kernel_size)
     model:add(conv)
     model:add(nn.Reshape(opts.num_feat_maps, -1, true))
 
@@ -44,7 +43,8 @@ function ModelBuilder:make_net(w2v, opts)
     --model:add(nn.Max(3)) -- max over time
     model:add(cudnn.ReLU())
   else
-    model:add(nn.TemporalConvolution(opts.vec_size, opts.num_feat_maps, opts.kernel_size))
+    conv = nn.TemporalConvolution(opts.vec_size, opts.num_feat_maps, opts.kernel_size)
+    model:add(conv)
     model:add(nn.ReLU())
     --model:add(nn.Transpose({2,3})) -- swap feature maps and time
     model:add(nn.Max(2)) -- max over time
@@ -55,6 +55,8 @@ function ModelBuilder:make_net(w2v, opts)
   linear.weight:uniform(-0.01, 0.01)
   linear.bias:zero()
   model:add(linear)
+  conv.weight:uniform(-0.01, 0.01)
+  conv.bias:zero()
 
   if opts.cudnn == 1 then
     model:add(cudnn.LogSoftMax())
