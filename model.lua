@@ -1,5 +1,6 @@
 require 'torch'
 require 'nn'
+require 'nngraph'
 
 local ModelBuilder = torch.class('ModelBuilder')
 
@@ -8,14 +9,21 @@ function ModelBuilder.init_cmd(cmd)
   cmd:option('-vec_size', 300, 'word2vec vector size')
 
   cmd:option('-num_feat_maps', 100, 'Number of feature maps after 1st convolution')
-  cmd:option('-kernel_size', 3, 'Kernel size of convolution')
+  cmd:option('-kernel1', 3, 'Kernel size of convolution 1')
+  cmd:option('-kernel2', 4, 'Kernel size of convolution 2')
+  cmd:option('-kernel3', 5, 'Kernel size of convolution 3')
+  max_pool = nn.ReLU()
   cmd:option('-dropout_p', 0.5, 'p for dropout')
   cmd:option('-num_classes', 2, 'Number of output classes')
 end
 
 function ModelBuilder:make_net(w2v, opts)
-  self.model = nn.Sequential()
-  local model = self.model
+  if opts.cudnn == 1 then
+    require 'cudnn'
+    require 'cunn'
+  end
+
+  local input = nn.Identity()()
 
   local lookup = nn.LookupTable(opts.vocab_size, opts.vec_size)
   if opts.model_type == 'static' or opts.model_type == 'nonstatic' then
@@ -25,66 +33,87 @@ function ModelBuilder:make_net(w2v, opts)
   end
   -- padding should always be 0
   lookup.weight[1]:zero()
-  model:add(lookup)
-  
-  local conv
-  if opts.cudnn == 1 then
-    require 'cudnn'
-    require 'cunn'
-    -- Reshape for spatial convolution
-    model:add(nn.Reshape(1, -1, opts.vec_size, true))
-    conv = cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, opts.kernel_size)
-    model:add(conv)
-    model:add(nn.Reshape(opts.num_feat_maps, -1, true))
 
-    model:add(nn.Max(3))
-    --model:add(nn.TemporalConvolutionFB(opts.vec_size, opts.num_feat_maps, opts.kernel_size))
-    --model:add(nn.Transpose({2,3})) -- swap feature maps and time
-    --model:add(nn.Max(3)) -- max over time
-    model:add(cudnn.ReLU())
-  else
-    conv = nn.TemporalConvolution(opts.vec_size, opts.num_feat_maps, opts.kernel_size)
-    model:add(conv)
-    model:add(nn.ReLU())
-    --model:add(nn.Transpose({2,3})) -- swap feature maps and time
-    model:add(nn.Max(2)) -- max over time
+  local lookup_layer = lookup(input)
+
+  -- kernels is an array of kernel sizes
+  local kernels = {opts.kernel1, opts.kernel2, opts.kernel3} -- ???
+  local layer1 = {}
+  for i = 1, #kernels do
+    local conv
+    local conv_layer
+    local max_pool
+    if opts.cudnn == 1 then
+      conv = cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, kernels[i])
+ 
+      -- Reshape for spatial convolution
+      conv_layer = nn.Reshape(opts.num_feat_maps, -1, true)(conv(nn.Reshape(1, -1, opts.vec_size, true)(lookup_layer)))
+      max_pool = cudnn.ReLU()(nn.Max(3)(conv_layer))
+
+      --model:add(nn.TemporalConvolutionFB(opts.vec_size, opts.num_feat_maps, opts.kernel_size))
+      --model:add(nn.Transpose({2,3})) -- swap feature maps and time
+      --model:add(nn.Max(3)) -- max over time
+    else
+      conv = nn.TemporalConvolution(opts.vec_size, opts.num_feat_maps, kernels[i])
+      conv_layer = conv(lookup_layer)
+      --model:add(nn.Transpose({2,3})) -- swap feature maps and time
+      max_pool = nn.Max(2)(nn.ReLU()(conv)) -- max over time
+    end
+
+    conv.weight:uniform(-0.01, 0.01)
+    conv.bias:zero()
+    table.insert(layer1, max_pool)
   end
 
-  model:add(nn.Dropout(opts.dropout_p))
-  local linear = nn.Linear(opts.num_feat_maps, opts.num_classes)
+  local conv_layer_concat
+  if #kernels > 1 then
+    conv_layer_concat = nn.JoinTable(2)(layer1)
+  else
+    conv_layer_concat = layer1[1]
+  end
+
+  local dropout_layer = nn.Dropout(opts.dropout_p)(conv_layer_concat)
+  local linear = nn.Linear((#kernels) * opts.num_feat_maps, opts.num_classes)
   linear.weight:uniform(-0.01, 0.01)
   linear.bias:zero()
-  model:add(linear)
-  conv.weight:uniform(-0.01, 0.01)
-  conv.bias:zero()
 
+  local output
   if opts.cudnn == 1 then
-    model:add(cudnn.LogSoftMax())
+    output = cudnn.LogSoftMax()(linear(dropout_layer))
   else
-    model:add(nn.LogSoftMax())
+    output = nn.LogSoftMax()(linear(dropout_layer))
   end
 
+  self.model = nn.gModule({input}, {output})
   return self.model
 end
 
 function ModelBuilder:get_linear()
   if not self.model then return end
 
-  for i = 1, #self.model do
-    if torch.typename(self.model.modules[i]) == 'nn.Linear' then
-      return self.model.modules[i]
+  local linear
+  function get_layer(layer)
+    if torch.typename(layer) == 'nn.Linear' then
+      linear = layer
     end
   end
+
+  self.model:apply(get_layer)
+  return linear
 end
 
 function ModelBuilder:get_w2v()
   if not self.model then return end
 
-  for i = 1, #self.model do
-    if torch.typename(self.model.modules[i]) == 'nn.LookupTable' then
-      return self.model.modules[i]
+  local w2v
+  function get_layer(layer)
+    if torch.typename(layer) == 'nn.LookupTable' then
+      w2v = layer
     end
   end
+
+  self.model:apply(get_layer)
+  return w2v
 end
 
 return ModelBuilder

@@ -19,6 +19,8 @@ cmd:option('-model_type', 'rand', 'Model type. Options: rand (randomly initializ
 cmd:option('-data', 'data.hdf5', 'Training data and word2vec data')
 cmd:option('-cudnn', 0, 'Use cudnn and GPUs if set to 1, otherwise set to 0')
 cmd:option('-seed', 35392, 'random seed')
+cmd:option('-folds', 10, 'number of folds to use. max 10')
+cmd:option('-learn_start', 0, 'learned start padding')
 
 trainer.init_cmd(cmd)
 model_builder.init_cmd(cmd)
@@ -42,20 +44,29 @@ local data_label = f:read('data_label'):all()
 local w2v = f:read('w2v'):all()
 print('data loaded!')
 
+opts.vocab_size = w2v:size(1)
+print('vocab size: ' .. opts.vocab_size)
+
 -- Zero-pad at start
-local max_filt_sz = 3 -- this should depend on filter size
+local max_filt_sz = torch.max(torch.Tensor{opts.kernel1, opts.kernel2, opts.kernel3})
 local tmp_data = torch.ones(data:size(1), data:size(2) + max_filt_sz - 1)
 tmp_data[{{}, {max_filt_sz,tmp_data:size(2)}}]:copy(data)
+if opts.learn_start == 1 then
+  -- add start padding that gets learned
+  tmp_data[{{}, {1,max_filt_sz-1}}] = opts.vocab_size + 1
+  opts.vocab_size = opts.vocab_size + 1
+  w2v = torch.cat(w2v, torch.Tensor(1, w2v:size(2)):uniform(-0.25, 0.25), 1)-- append to w2v
+end
 data = tmp_data
 collectgarbage()
 
-opts.vocab_size = w2v:size(1)
-print('vocab size: ' .. opts.vocab_size)
 
 local N = data:size(1)
 local fold_dev_scores = {}
 local fold_test_scores = {}
-for fold = 1, 10 do
+
+for fold = 1, opts.folds do
+  print()
   print('==> fold ' .. fold)
 
   -- make train/dev/test data (90/10 split for train/test)
@@ -87,7 +98,7 @@ for fold = 1, 10 do
   -- move to GPU
   if opts.cudnn == 1 then
     require 'cutorch'
-    cutorch.setDevice(0)
+    --cutorch.setDevice(0)
     model:cuda()
     criterion:cuda()
   end
@@ -138,5 +149,7 @@ end
 
 print('dev scores:')
 print(fold_dev_scores)
+print('average dev score: ' .. torch.Tensor(fold_dev_scores):mean())
 print('test scores:')
 print(fold_test_scores)
+print('average test score: ' .. torch.Tensor(fold_test_scores):mean())
