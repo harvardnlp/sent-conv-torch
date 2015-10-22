@@ -41,3 +41,6 @@ luac.out
 
 # vim .swp files
 *.swp
+
+# don't include data
+*.hdf5
