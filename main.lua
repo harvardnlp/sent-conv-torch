@@ -57,6 +57,13 @@ if opts.learn_start == 1 then
   opts.vocab_size = opts.vocab_size + 1
   w2v = torch.cat(w2v, torch.Tensor(1, w2v:size(2)):uniform(-0.25, 0.25), 1)-- append to w2v
 end
+-- make data size a multiple of batch size
+if tmp_data:size(1) % opts.batch_size > 0 then
+  local remainder = tmp_data:size(1) % opts.batch_size
+  local shuffle = torch.randperm(tmp_data:size(1)):long()
+  tmp_data = torch.cat(tmp_data, tmp_data:index(1, shuffle):narrow(1, 1, opts.batch_size - remainder), 1)
+  data_label = torch.cat(data_label, data_label:index(1, shuffle):narrow(1, 1, opts.batch_size - remainder), 1)
+end
 data = tmp_data
 collectgarbage()
 
@@ -64,6 +71,11 @@ collectgarbage()
 local N = data:size(1)
 local fold_dev_scores = {}
 local fold_test_scores = {}
+
+-- shuffle data
+local shuffle = torch.randperm(data:size(1)):long()
+data = data:index(1, shuffle)
+data_label = data_label:index(1, shuffle)
 
 for fold = 1, opts.folds do
   local fold_time = sys.clock()

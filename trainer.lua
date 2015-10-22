@@ -28,7 +28,6 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
 
   local config = { rho = 0.95, eps = 1e-6 } -- for optim
   for t = 1, train_size, opts.batch_size do
-    --print('Batch ' .. t)
     -- data samples and labels, in mini batches.
     local batch_size = math.min(opts.batch_size, train_size - t + 1)
     local inputs = train_data:narrow(1, t, batch_size)
@@ -83,14 +82,11 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
       end
     end
 
+    -- renormalize linear row weights
     local w = layers.linear.weight
     for i = 1, w:size(1) do
       renorm(w[i])
     end
-    --local n = w:view(w:size(1)*w:size(2)):norm()
-    --if (n > opts.L2s) then 
-      --w:mul(opts.L2s):div(n)
-    --end
   end
 
   print('Total err: ' .. total_err / train_size)
