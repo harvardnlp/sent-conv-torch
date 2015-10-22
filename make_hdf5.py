@@ -59,19 +59,20 @@ def load_data(pos_fname, neg_fname):
   pos_data = []
   neg_data = []
 
+  extra_padding = 7
   for line in pos_file:
       words = line_to_words(line)
       sent = [word_to_idx[word] for word in words]
-      if len(sent) < max_sent_len:
-          sent.extend([1] * (max_sent_len - len(sent)))
+      if len(sent) < max_sent_len + extra_padding:
+          sent.extend([1] * (max_sent_len + extra_padding - len(sent)))
 
       pos_data.append(sent)
 
   for line in neg_file:
       words = line_to_words(line)
       sent = [word_to_idx[word] for word in words]
-      if len(sent) < max_sent_len:
-          sent.extend([1] * (max_sent_len - len(sent)))
+      if len(sent) < max_sent_len + extra_padding:
+          sent.extend([1] * (max_sent_len + extra_padding - len(sent)))
 
       neg_data.append(sent)
 

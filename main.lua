@@ -66,12 +66,14 @@ local fold_dev_scores = {}
 local fold_test_scores = {}
 
 for fold = 1, opts.folds do
+  local fold_time = sys.clock()
+
   print()
   print('==> fold ' .. fold)
 
   -- make train/dev/test data (90/10 split for train/test)
-  local i_start = (fold - 1) * 0.1 * N + 1
-  local i_end = fold * 0.1 * N
+  local i_start = math.floor((fold - 1) * 0.1 * N + 1)
+  local i_end = math.floor(fold * 0.1 * N)
   local test = data:narrow(1, i_start, i_end - i_start + 1)
   local test_label = data_label:narrow(1, i_start, i_end - i_start + 1)
   local train = torch.cat(data:narrow(1, 1, i_start), data:narrow(1, i_end, N - i_end + 1), 1)
@@ -83,7 +85,7 @@ for fold = 1, opts.folds do
   train = train:index(1, shuffle)
   train_label = train_label:index(1, shuffle)
 
-  local dev_size = 0.1 * J
+  local dev_size = math.floor(0.1 * J)
   local dev = train:narrow(1, 1, dev_size)
   local dev_label = train_label:narrow(1, 1, dev_size)
   local train_size = J - dev_size + 1
@@ -114,6 +116,8 @@ for fold = 1, opts.folds do
   local best_err = 0.0
 
   for epoch = 1, opts.num_epochs do
+    local epoch_time = sys.clock()
+
     -- shuffle data
     shuffle = torch.randperm(train:size(1)):long()
     train = train:index(1, shuffle)
@@ -131,6 +135,8 @@ for fold = 1, opts.folds do
       best_err = err_rate
     end
 
+    print()
+    print('time for one epoch: ' .. ((sys.clock() - epoch_time) * 1000) .. 'ms')
     print('\n')
   end
 
@@ -143,6 +149,9 @@ for fold = 1, opts.folds do
   table.insert(fold_dev_scores, best_err)
   table.insert(fold_test_scores, test_err)
 
+  print()
+  print('time for one fold: ' .. ((sys.clock() - fold_time) * 1000) .. 'ms')
+  print('\n')
   -- reset model
   model_builder.model = nil
 end

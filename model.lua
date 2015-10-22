@@ -12,7 +12,6 @@ function ModelBuilder.init_cmd(cmd)
   cmd:option('-kernel1', 3, 'Kernel size of convolution 1')
   cmd:option('-kernel2', 4, 'Kernel size of convolution 2')
   cmd:option('-kernel3', 5, 'Kernel size of convolution 3')
-  max_pool = nn.ReLU()
   cmd:option('-dropout_p', 0.5, 'p for dropout')
   cmd:option('-num_classes', 2, 'Number of output classes')
 end
@@ -37,7 +36,7 @@ function ModelBuilder:make_net(w2v, opts)
   local lookup_layer = lookup(input)
 
   -- kernels is an array of kernel sizes
-  local kernels = {opts.kernel1, opts.kernel2, opts.kernel3} -- ???
+  local kernels = {opts.kernel1, opts.kernel2, opts.kernel3}
   local layer1 = {}
   for i = 1, #kernels do
     local conv
@@ -45,14 +44,10 @@ function ModelBuilder:make_net(w2v, opts)
     local max_pool
     if opts.cudnn == 1 then
       conv = cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, kernels[i])
- 
+
       -- Reshape for spatial convolution
       conv_layer = nn.Reshape(opts.num_feat_maps, -1, true)(conv(nn.Reshape(1, -1, opts.vec_size, true)(lookup_layer)))
       max_pool = cudnn.ReLU()(nn.Max(3)(conv_layer))
-
-      --model:add(nn.TemporalConvolutionFB(opts.vec_size, opts.num_feat_maps, opts.kernel_size))
-      --model:add(nn.Transpose({2,3})) -- swap feature maps and time
-      --model:add(nn.Max(3)) -- max over time
     else
       conv = nn.TemporalConvolution(opts.vec_size, opts.num_feat_maps, kernels[i])
       conv_layer = conv(lookup_layer)
@@ -72,16 +67,15 @@ function ModelBuilder:make_net(w2v, opts)
     conv_layer_concat = layer1[1]
   end
 
-  local dropout_layer = nn.Dropout(opts.dropout_p)(conv_layer_concat)
   local linear = nn.Linear((#kernels) * opts.num_feat_maps, opts.num_classes)
   linear.weight:uniform(-0.01, 0.01)
   linear.bias:zero()
 
   local output
   if opts.cudnn == 1 then
-    output = cudnn.LogSoftMax()(linear(dropout_layer))
+    output = cudnn.LogSoftMax()(linear(nn.Dropout(opts.dropout_p)(conv_layer_concat)))
   else
-    output = nn.LogSoftMax()(linear(dropout_layer))
+    output = nn.LogSoftMax()(linear(nn.Dropout(opts.dropout_p)(conv_layer_concat)))
   end
 
   self.model = nn.gModule({input}, {output})

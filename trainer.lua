@@ -7,7 +7,7 @@ local Trainer = torch.class('Trainer')
 function Trainer.init_cmd(cmd)
   cmd:option('-optim_method', 'adadelta', 'Gradient descent method. Options: adadelta')
   cmd:option('-L2s', 3, 'L2 normalize weights')
-  cmd:option('-batch_size', 32, 'Batch size for training')
+  cmd:option('-batch_size', 50, 'Batch size for training')
 end
 
 -- Perform one epoch of training.
@@ -26,7 +26,7 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
   local confusion = optim.ConfusionMatrix(classes)
   confusion:zero()
 
-  local config = { rho = 0.95 } -- for optim
+  local config = { rho = 0.95, eps = 1e-6 } -- for optim
   for t = 1, train_size, opts.batch_size do
     --print('Batch ' .. t)
     -- data samples and labels, in mini batches.
@@ -79,14 +79,13 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
     local renorm = function(row)
       local n = row:norm()
       if (n > opts.L2s) then
-        row:mul(opts.L2s):div(n)
+        row:mul(opts.L2s):div(1e-7 + n)
       end
     end
 
     local w = layers.linear.weight
     for i = 1, w:size(1) do
-      row = w[i]
-      renorm(row)
+      renorm(w[i])
     end
     --local n = w:view(w:size(1)*w:size(2)):norm()
     --if (n > opts.L2s) then 
