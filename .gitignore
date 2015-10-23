@@ -44,3 +44,6 @@ luac.out
 
 # don't include data
 *.hdf5
+
+# ignore results
+results
