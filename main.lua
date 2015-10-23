@@ -134,11 +134,6 @@ for fold = 1, opts.folds do
   for epoch = 1, opts.num_epochs do
     local epoch_time = sys.clock()
 
-    -- shuffle data
-    shuffle = torch.randperm(train:size(1)):long()
-    train = train:index(1, shuffle)
-    train_label = train_label:index(1, shuffle)
-
     local train_err = trainer:train(train, train_label, model, criterion, optim_method, layers, opts)
 
     local dev_err = trainer:test(dev, dev_label, model, criterion, opts)

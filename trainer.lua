@@ -33,7 +33,12 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
     config = {}
   end
 
-  for t = 1, train_size, opts.batch_size do
+  -- indices for shuffled batches
+  local num_batches = math.ceil(train_size / opts.batch_size)
+  local shuffle = torch.randperm(num_batches):mul(opts.batch_size):add(-opts.batch_size + 1)
+  for i = 1, shuffle:size(1) do
+    local t = shuffle[i]
+
     -- data samples and labels, in mini batches.
     local batch_size = math.min(opts.batch_size, train_size - t + 1)
     local inputs = train_data:narrow(1, t, batch_size)
