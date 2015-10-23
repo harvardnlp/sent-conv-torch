@@ -1,6 +1,7 @@
 require 'torch'
 require 'nn'
 require 'nngraph'
+local HighwayMLP = require 'highway_mlp'
 
 local ModelBuilder = torch.class('ModelBuilder')
 
@@ -13,6 +14,7 @@ function ModelBuilder.init_cmd(cmd)
   cmd:option('-kernel2', 4, 'Kernel size of convolution 2')
   cmd:option('-kernel3', 5, 'Kernel size of convolution 3')
   cmd:option('-dropout_p', 0.5, 'p for dropout')
+  cmd:option('-highway_layers', 0, 'Number of highway layers')
   cmd:option('-num_classes', 2, 'Number of output classes')
 end
 
@@ -67,16 +69,25 @@ function ModelBuilder:make_net(w2v, opts)
     conv_layer_concat = layer1[1]
   end
 
+  local softmax
+  if opts.cudnn == 1 then
+    softmax = cudnn.LogSoftMax()
+  else
+    softmax = nn.LogSoftMax()
+  end
+
+  local last_layer = conv_layer_concat
+  if opts.highway_layers > 0 then
+    -- use highway layers
+    local highway = HighwayMLP.mlp((#kernels) * opts.num_feat_maps, opts.highway_layers)
+    last_layer = highway(conv_layer_concat)
+  end
+
+  -- simple MLP layer
   local linear = nn.Linear((#kernels) * opts.num_feat_maps, opts.num_classes)
   linear.weight:uniform(-0.01, 0.01)
   linear.bias:zero()
-
-  local output
-  if opts.cudnn == 1 then
-    output = cudnn.LogSoftMax()(linear(nn.Dropout(opts.dropout_p)(conv_layer_concat)))
-  else
-    output = nn.LogSoftMax()(linear(nn.Dropout(opts.dropout_p)(conv_layer_concat)))
-  end
+  local output = softmax(linear(nn.Dropout(opts.dropout_p)(last_layer)))
 
   self.model = nn.gModule({input}, {output})
   return self.model
