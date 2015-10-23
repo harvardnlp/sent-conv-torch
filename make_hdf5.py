@@ -105,7 +105,8 @@ def clean_str(string, TREC=False):
 
 if __name__ == '__main__':
   data, labels, word_to_idx = load_data("rt-polarity.pos", "rt-polarity.neg")
-  w2v = load_bin_vec("/n/rush_lab/data/GoogleNews-vectors-negative300.bin", word_to_idx)
+  # w2v = load_bin_vec("/n/rush_lab/data/GoogleNews-vectors-negative300.bin", word_to_idx)
+  w2v = load_bin_vec("../CNN_sentence/GoogleNews-vectors-negative300.bin", word_to_idx)
   V = len(word_to_idx) + 1
   print 'Vocab size:', V
 

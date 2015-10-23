@@ -53,8 +53,8 @@ function ModelBuilder:make_net(w2v, opts)
     else
       conv = nn.TemporalConvolution(opts.vec_size, opts.num_feat_maps, kernels[i])
       conv_layer = conv(lookup_layer)
-      --model:add(nn.Transpose({2,3})) -- swap feature maps and time
-      max_pool = nn.Max(2)(nn.ReLU()(conv)) -- max over time
+      --max_pool = nn.Max(3)(nn.Transpose({2,3})(nn.ReLU()(conv_layer))) -- max over time
+      max_pool = nn.Max(2)(nn.ReLU()(conv_layer)) -- max over time
     end
 
     conv.weight:uniform(-0.01, 0.01)
