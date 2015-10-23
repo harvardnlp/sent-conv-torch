@@ -5,7 +5,7 @@ require 'torch'
 local Trainer = torch.class('Trainer')
 
 function Trainer.init_cmd(cmd)
-  cmd:option('-optim_method', 'adadelta', 'Gradient descent method. Options: adadelta')
+  cmd:option('-optim_method', 'adadelta', 'Gradient descent method. Options: adadelta, adam')
   cmd:option('-L2s', 3, 'L2 normalize weights')
   cmd:option('-batch_size', 50, 'Batch size for training')
 end
@@ -26,7 +26,13 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
   local confusion = optim.ConfusionMatrix(classes)
   confusion:zero()
 
-  local config = { rho = 0.95, eps = 1e-6 } -- for optim
+  local config -- for optim
+  if opts.optim_method == 'adadelta' then
+    config = { rho = 0.95, eps = 1e-6 } 
+  elseif opts.optim_method == 'adam' then
+    config = {}
+  end
+
   for t = 1, train_size, opts.batch_size do
     -- data samples and labels, in mini batches.
     local batch_size = math.min(opts.batch_size, train_size - t + 1)
@@ -89,13 +95,21 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
     end
   end
 
-  print('Total err: ' .. total_err / train_size)
-  print(confusion)
+  if opts.debug == 1 then
+    print('Total err: ' .. total_err / train_size)
+    print(confusion)
+  end
 
   -- time taken
   time = sys.clock() - time
   time = opts.batch_size * time / train_size
-  print("==> time to learn 1 batch = " .. (time*1000) .. 'ms')
+  if opts.debug == 1 then
+    print("==> time to learn 1 batch = " .. (time*1000) .. 'ms')
+  end
+
+  -- return error percent
+  confusion:updateValids()
+  return confusion.totalValid
 end
 
 function Trainer:test(test_data, test_labels, model, criterion, opts)
@@ -131,10 +145,13 @@ function Trainer:test(test_data, test_labels, model, criterion, opts)
     end
   end
 
-  print(confusion)
-  print('Total err: ' .. total_err / test_size)
+  if opts.debug == 1 then
+    print(confusion)
+    print('Total err: ' .. total_err / test_size)
+  end
 
   -- return error percent
+  confusion:updateValids()
   return confusion.totalValid
 end
 

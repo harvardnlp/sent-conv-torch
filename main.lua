@@ -21,6 +21,7 @@ cmd:option('-cudnn', 0, 'Use cudnn and GPUs if set to 1, otherwise set to 0')
 cmd:option('-seed', 35392, 'random seed')
 cmd:option('-folds', 10, 'number of folds to use. max 10')
 cmd:option('-learn_start', 0, 'learned start padding')
+cmd:option('-debug', 0, 'print debugging info including timing, confusions')
 
 trainer.init_cmd(cmd)
 model_builder.init_cmd(cmd)
@@ -31,9 +32,11 @@ local opts = cmd:parse(arg)
 torch.manualSeed(opts.seed)
 
 -- Currently only adadelta allowed
-local optim_method = optim.adadelta
+local optim_method
 if opts.optim_method == 'adadelta' then
   optim_method = optim.adadelta
+elseif opts.optim_method == 'adam' then
+  optim_method = optim.adam
 end
 
 -- Read HDF5 training data
@@ -136,35 +139,36 @@ for fold = 1, opts.folds do
     train = train:index(1, shuffle)
     train_label = train_label:index(1, shuffle)
 
-    print('==> training epoch ' .. epoch)
-    trainer:train(train, train_label, model, criterion, optim_method, layers, opts)
+    local train_err = trainer:train(train, train_label, model, criterion, optim_method, layers, opts)
 
-    print('\n')
-    print('==> evaluate...')
-    local err_rate = trainer:test(dev, dev_label, model, criterion, opts)
-    if err_rate > best_err then
+    local dev_err = trainer:test(dev, dev_label, model, criterion, opts)
+    if dev_err > best_err then
       best_model = model:clone()
       best_epoch = epoch
-      best_err = err_rate
+      best_err = dev_err 
     end
 
-    print()
-    print('time for one epoch: ' .. ((sys.clock() - epoch_time) * 1000) .. 'ms')
-    print('\n')
+    if opts.debug == 1 then
+      print()
+      print('time for one epoch: ' .. ((sys.clock() - epoch_time) * 1000) .. 'ms')
+      print('\n')
+    end
+
+    print('epoch ' .. epoch .. ', train perf ' .. 100*train_err .. '%, val perf ' .. 100*dev_err .. '%')
   end
 
-  print('best epoch: ' .. best_epoch)
-  print('best dev err: ' .. 100*best_err .. '%')
-  print('\n')
-  print('==> test for fold ' .. fold)
+  print('best dev err: ' .. 100*best_err .. '%, epoch ' .. best_epoch)
   local test_err = trainer:test(test, test_label, best_model, criterion, opts)
+  print('test perf ' .. 100*test_err .. '%')
 
   table.insert(fold_dev_scores, best_err)
   table.insert(fold_test_scores, test_err)
 
-  print()
-  print('time for one fold: ' .. ((sys.clock() - fold_time) * 1000) .. 'ms')
-  print('\n')
+  if opts.debug == 1 then
+    print()
+    print('time for one fold: ' .. ((sys.clock() - fold_time) * 1000) .. 'ms')
+    print('\n')
+  end
   -- reset model
   model_builder.model = nil
 end
@@ -176,6 +180,6 @@ print('test scores:')
 print(fold_test_scores)
 print('average test score: ' .. torch.Tensor(fold_test_scores):mean())
 
-local savefile = string.format('%s_results.txt', os.date('%Y%m%d_%H%M'))
+local savefile = string.format('results/%s_results', os.date('%Y%m%d_%H%M'))
 print('saving results to ' .. savefile)
-torch.save(savefile, { dev_scores = fold_dev_scores, test_scores = fold_test_scores })
+torch.save(savefile, { dev_scores = fold_dev_scores, test_scores = fold_test_scores, opts = opts })
