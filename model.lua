@@ -89,13 +89,11 @@ function ModelBuilder:make_net(w2v, opts)
   linear.bias:zero()
   local output = softmax(linear(nn.Dropout(opts.dropout_p)(last_layer)))
 
-  self.model = nn.gModule({input}, {output})
-  return self.model
+  model = nn.gModule({input}, {output})
+  return model
 end
 
-function ModelBuilder:get_linear()
-  if not self.model then return end
-
+function ModelBuilder:get_linear(model)
   local linear
   function get_layer(layer)
     if torch.typename(layer) == 'nn.Linear' then
@@ -103,13 +101,11 @@ function ModelBuilder:get_linear()
     end
   end
 
-  self.model:apply(get_layer)
+  model:apply(get_layer)
   return linear
 end
 
-function ModelBuilder:get_w2v()
-  if not self.model then return end
-
+function ModelBuilder:get_w2v(model)
   local w2v
   function get_layer(layer)
     if torch.typename(layer) == 'nn.LookupTable' then
@@ -117,7 +113,7 @@ function ModelBuilder:get_w2v()
     end
   end
 
-  self.model:apply(get_layer)
+  model:apply(get_layer)
   return w2v
 end
 

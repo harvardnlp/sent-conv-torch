@@ -18,6 +18,7 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
   _, w2v_grads = layers.w2v:getParameters()
 
   local train_size = train_data:size(1)
+  local batch_size = opts.batch_size
 
   local time = sys.clock()
   local total_err = 0
@@ -33,14 +34,13 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
     config = {}
   end
 
-  -- indices for shuffled batches
-  local num_batches = math.ceil(train_size / opts.batch_size)
-  local shuffle = torch.randperm(num_batches):mul(opts.batch_size):add(-opts.batch_size + 1)
+  -- shuffle batches
+  local num_batches = math.floor(train_size / batch_size)
+  local shuffle = torch.randperm(num_batches)
   for i = 1, shuffle:size(1) do
-    local t = shuffle[i]
+    local t = (shuffle[i] - 1) * batch_size + 1
 
     -- data samples and labels, in mini batches.
-    local batch_size = math.min(opts.batch_size, train_size - t + 1)
     local inputs = train_data:narrow(1, t, batch_size)
     local targets = train_labels:narrow(1, t, batch_size)
     if opts.cudnn == 1 then
@@ -60,21 +60,23 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
       -- reset gradients
       grads:zero()
 
-      -- compute gradients
+      -- forward pass
       local outputs = model:forward(inputs)
       local err = criterion:forward(outputs, targets)
 
+      -- track errors and confusion
+      total_err = total_err + err * batch_size
+      for i = 1, batch_size do
+        confusion:add(outputs[i], targets[i])
+      end
+
+      -- compute gradients
       local df_do = criterion:backward(outputs, targets)
       model:backward(inputs, df_do)
 
       if opts.model_type == 'static' then
         -- don't update embeddings for static model
         w2v_grads:zero()
-      end
-
-      total_err = total_err + err * batch_size
-      for i = 1, batch_size do
-        confusion:add(outputs[i], targets[i])
       end
 
       return err, grads

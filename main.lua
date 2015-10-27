@@ -96,17 +96,28 @@ for fold = 1, opts.folds do
   end
 
   -- shuffle to get dev/train split (10% to dev)
+  -- We organize our data in batches at this split before epoch training.
   local J = train:size(1)
   local shuffle = torch.randperm(J):long()
   train = train:index(1, shuffle)
   train_label = train_label:index(1, shuffle)
 
-  local dev_size = math.floor(0.1 * J)
-  local dev = train:narrow(1, 1, dev_size)
-  local dev_label = train_label:narrow(1, 1, dev_size)
-  local train_size = J - dev_size + 1
-  train = train:narrow(1, dev_size, train_size)
-  train_label = train_label:narrow(1, dev_size, train_size)
+  local num_batches = math.floor(J / opts.batch_size)
+  local num_train_batches = torch.round(num_batches * 0.9)
+
+  local train_size = num_train_batches * opts.batch_size
+  local dev_size = J - train_size
+  local dev = train:narrow(1, train_size+1, dev_size)
+  local dev_label = train_label:narrow(1, train_size+1, dev_size)
+  train = train:narrow(1, 1, train_size)
+  train_label = train_label:narrow(1, 1, train_size)
+
+  if opts.debug == 1 then
+    print('train size:')
+    print(train:size())
+    print('dev size:')
+    print(dev:size())
+  end
 
   -- build model
   local model = model_builder:make_net(w2v, opts)
@@ -122,8 +133,8 @@ for fold = 1, opts.folds do
   end
 
   -- get layers
-  local linear = model_builder:get_linear()
-  local w2v_layer = model_builder:get_w2v()
+  local linear = model_builder:get_linear(model)
+  local w2v_layer = model_builder:get_w2v(model)
   local layers = {linear = linear, w2v = w2v_layer}
 
   -- Training loop.
@@ -164,8 +175,6 @@ for fold = 1, opts.folds do
     print('time for one fold: ' .. ((sys.clock() - fold_time) * 1000) .. 'ms')
     print('\n')
   end
-  -- reset model
-  model_builder.model = nil
 end
 
 print('dev scores:')
