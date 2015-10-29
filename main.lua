@@ -29,12 +29,13 @@ cmd:text()
 
 -- parse arguments
 local opts = cmd:parse(arg)
-torch.manualSeed(opts.seed)
+--torch.manualSeed(opts.seed)
 
 -- Currently only adadelta allowed
 local optim_method
 if opts.optim_method == 'adadelta' then
-  optim_method = optim.adadelta
+  --optim_method = optim.adadelta
+  optim_method = Trainer.adadelta
 elseif opts.optim_method == 'adam' then
   optim_method = optim.adam
 end
@@ -54,6 +55,7 @@ print('vocab size: ' .. opts.vocab_size)
 local max_filt_sz = torch.max(torch.Tensor{opts.kernel1, opts.kernel2, opts.kernel3})
 local tmp_data = torch.ones(data:size(1), data:size(2) + max_filt_sz - 1)
 tmp_data[{{}, {max_filt_sz,tmp_data:size(2)}}]:copy(data)
+
 if opts.learn_start == 1 then
   -- add start padding that gets learned
   tmp_data[{{}, {1,max_filt_sz-1}}] = opts.vocab_size + 1
@@ -63,6 +65,9 @@ end
 data = tmp_data
 collectgarbage()
 
+opts.max_sent = data:size(2)
+print('data size:')
+print(data:size())
 
 local N = data:size(1)
 local fold_dev_scores = {}
