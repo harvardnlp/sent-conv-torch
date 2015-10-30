@@ -22,7 +22,9 @@ cmd:option('-seed', 35392, 'random seed')
 cmd:option('-folds', 10, 'number of folds to use. max 10')
 cmd:option('-learn_start', 0, 'learned start padding')
 cmd:option('-debug', 0, 'print debugging info including timing, confusions')
-cmd:option('-use_cv', 1, 'If hdf5 data is not already split train/dev/test, we use CV to split')
+
+cmd:option('-has_test', 0, 'If data has test, we use it. Otherwise, we use CV on folds')
+cmd:option('-has_dev', 0, 'If data has dev, we use it, otherwise we split from train')
 
 trainer.init_cmd(cmd)
 model_builder.init_cmd(cmd)
@@ -42,61 +44,79 @@ elseif opts.optim_method == 'adam' then
 end
 
 -- Read HDF5 training data
+local test, test_label
+local train, train_label
+local dev, dev_label
+
 print('loading data...')
 local f = hdf5.open(opts.data, 'r')
-local data = f:read('data'):all()
-local data_label = f:read('data_label'):all()
+if opts.has_test == 1 then
+  test = f:read('test'):all()
+  test_label = f:read('test_label'):all()
+  train = f:read('train'):all()
+  train_label = f:read('train_label'):all()
+end
+if opts.has_dev == 1 then
+  test = f:read('test'):all()
+  test_label = f:read('test_label'):all()
+  train = f:read('train'):all()
+  train_label = f:read('train_label'):all()
+  dev = f:read('dev'):all()
+  dev_label = f:read('dev_label'):all()
+end
+
+-- Need CV split
+if opts.has_dev == 0 and opts.has_test == 0 then
+  train = f:read('data'):all()
+  train_label = f:read('data_label'):all()
+end
 local w2v = f:read('w2v'):all()
 print('data loaded!')
 
 opts.vocab_size = w2v:size(1)
 print('vocab size: ' .. opts.vocab_size)
 
--- Zero-pad at start
-local max_filt_sz = torch.max(torch.Tensor{opts.kernel1, opts.kernel2, opts.kernel3})
-local tmp_data = torch.ones(data:size(1), data:size(2) + max_filt_sz - 1)
-tmp_data[{{}, {max_filt_sz,tmp_data:size(2)}}]:copy(data)
-
-if opts.learn_start == 1 then
-  -- add start padding that gets learned
-  tmp_data[{{}, {1,max_filt_sz-1}}] = opts.vocab_size + 1
-  opts.vocab_size = opts.vocab_size + 1
-  w2v = torch.cat(w2v, torch.Tensor(1, w2v:size(2)):uniform(-0.25, 0.25), 1)-- append to w2v
-end
-data = tmp_data
-collectgarbage()
-
-opts.max_sent = data:size(2)
+opts.max_sent = train:size(2)
 print('data size:')
-print(data:size())
+print(train:size())
 
-local N = data:size(1)
 local fold_dev_scores = {}
 local fold_test_scores = {}
 
 -- shuffle data
-local shuffle = torch.randperm(data:size(1)):long()
-data = data:index(1, shuffle)
-data_label = data_label:index(1, shuffle)
+local data = {train, dev, test}
+local data_label = {train_label, dev_label, test_label}
+for i = 1, #data do
+  if not data[i] == nil then
+    local shuffle = torch.randperm(data[i]:size(1)):long()
+    data[i] = data[i]:index(1, shuffle)
+    data_label[i] = data_label[i]:index(1, shuffle)
+  end
+end
 
+local best_model -- save best model
+if opts.has_test == 1 then
+  -- don't do CV if we have a test set
+  opts.folds = 1
+end
 for fold = 1, opts.folds do
   local fold_time = sys.clock()
 
   print()
   print('==> fold ' .. fold)
 
-  local test, test_label
-  local train, train_label
-  local dev, dev_label
-  if opts.use_cv == 1 then
-    -- make train/dev/test data (90/10 split for train/test)
+  if opts.has_test == 0 then
+    -- make train/test data (90/10 split for train/test)
+    local N = train:size(1)
     local i_start = math.floor((fold - 1) * 0.1 * N + 1)
     local i_end = math.floor(fold * 0.1 * N)
-    test = data:narrow(1, i_start, i_end - i_start + 1)
-    test_label = data_label:narrow(1, i_start, i_end - i_start + 1)
-    train = torch.cat(data:narrow(1, 1, i_start), data:narrow(1, i_end, N - i_end + 1), 1)
-    train_label = torch.cat(data_label:narrow(1, 1, i_start), data_label:narrow(1, i_end, N - i_end + 1), 1)
+    test = train:narrow(1, i_start, i_end - i_start + 1)
+    test_label = train_label:narrow(1, i_start, i_end - i_start + 1)
+    train = torch.cat(train:narrow(1, 1, i_start), train:narrow(1, i_end, N - i_end + 1), 1)
+    train_label = torch.cat(train_label:narrow(1, 1, i_start), train_label:narrow(1, i_end, N - i_end + 1), 1)
+  end
 
+  if opts.has_dev == 0 then
     -- shuffle to get dev/train split (10% to dev)
     -- We organize our data in batches at this split before epoch training.
     local J = train:size(1)
@@ -113,9 +133,6 @@ for fold = 1, opts.folds do
     dev_label = train_label:narrow(1, train_size+1, dev_size)
     train = train:narrow(1, 1, train_size)
     train_label = train_label:narrow(1, 1, train_size)
-  else
-    print('hi')
-    -- Assume data is already split for us.
   end
 
   if opts.debug == 1 then
@@ -146,7 +163,7 @@ for fold = 1, opts.folds do
   local layers = {linear = linear, w2v = w2v_layer, skip_conv = skip_conv}
 
   -- Training loop.
-  local best_model = model:clone()
+  best_model = model:clone()
   local best_epoch = 1
   local best_err = 0.0
 
@@ -194,4 +211,4 @@ print('average test score: ' .. torch.Tensor(fold_test_scores):mean())
 
 local savefile = string.format('results/%s_results', os.date('%Y%m%d_%H%M'))
 print('saving results to ' .. savefile)
-torch.save(savefile, { dev_scores = fold_dev_scores, test_scores = fold_test_scores, opts = opts })
+torch.save(savefile, { dev_scores = fold_dev_scores, test_scores = fold_test_scores, opts = opts, model = best_model })

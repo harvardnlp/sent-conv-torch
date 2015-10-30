@@ -22,7 +22,10 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
   local time = sys.clock()
   local total_err = 0
 
-  local classes = {'1', '2'}
+  local classes = {}
+  for i = 1, opts.num_classes do
+    table.insert(classes, i)
+  end
   local confusion = optim.ConfusionMatrix(classes)
   confusion:zero()
 
@@ -124,7 +127,10 @@ end
 function Trainer:test(test_data, test_labels, model, criterion, opts)
   model:evaluate()
 
-  local classes = {'1', '2'}
+  local classes = {}
+  for i = 1, opts.num_classes do
+    table.insert(classes, i)
+  end
   local confusion = optim.ConfusionMatrix(classes)
   confusion:zero()
 
