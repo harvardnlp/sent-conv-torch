@@ -16,12 +16,13 @@ cmd:text()
 cmd:text('Options')
 cmd:option('-num_epochs', 25, 'Number of training epochs')
 cmd:option('-model_type', 'rand', 'Model type. Options: rand (randomly initialized word embeddings), static (pre-trained embeddings from word2vec, static during learning), nonstatic (pre-trained embeddings, tuned during learning), multichannel (TODO)')
-cmd:option('-data', 'data.hdf5', 'Training data and word2vec data')
+cmd:option('-data', 'MR.hdf5', 'Training data and word2vec data')
 cmd:option('-cudnn', 0, 'Use cudnn and GPUs if set to 1, otherwise set to 0')
 cmd:option('-seed', 35392, 'random seed')
 cmd:option('-folds', 10, 'number of folds to use. max 10')
 cmd:option('-learn_start', 0, 'learned start padding')
 cmd:option('-debug', 0, 'print debugging info including timing, confusions')
+cmd:option('-use_cv', 1, 'If hdf5 data is not already split train/dev/test, we use CV to split')
 
 trainer.init_cmd(cmd)
 model_builder.init_cmd(cmd)
@@ -84,38 +85,38 @@ for fold = 1, opts.folds do
   print()
   print('==> fold ' .. fold)
 
-  -- make train/dev/test data (90/10 split for train/test)
-  local i_start = math.floor((fold - 1) * 0.1 * N + 1)
-  local i_end = math.floor(fold * 0.1 * N)
-  local test = data:narrow(1, i_start, i_end - i_start + 1)
-  local test_label = data_label:narrow(1, i_start, i_end - i_start + 1)
-  local train = torch.cat(data:narrow(1, 1, i_start), data:narrow(1, i_end, N - i_end + 1), 1)
-  local train_label = torch.cat(data_label:narrow(1, 1, i_start), data_label:narrow(1, i_end, N - i_end + 1), 1)
+  local test, test_label
+  local train, train_label
+  local dev, dev_label
+  if opts.use_cv == 1 then
+    -- make train/dev/test data (90/10 split for train/test)
+    local i_start = math.floor((fold - 1) * 0.1 * N + 1)
+    local i_end = math.floor(fold * 0.1 * N)
+    test = data:narrow(1, i_start, i_end - i_start + 1)
+    test_label = data_label:narrow(1, i_start, i_end - i_start + 1)
+    train = torch.cat(data:narrow(1, 1, i_start), data:narrow(1, i_end, N - i_end + 1), 1)
+    train_label = torch.cat(data_label:narrow(1, 1, i_start), data_label:narrow(1, i_end, N - i_end + 1), 1)
 
-  -- make data size a multiple of batch size
-  if train:size(1) % opts.batch_size > 0 then
-    local remainder = train:size(1) % opts.batch_size
-    local shuffle = torch.randperm(train:size(1)):long()
-    train = torch.cat(train, train:index(1, shuffle):narrow(1, 1, opts.batch_size - remainder), 1)
-    train_label = torch.cat(train_label, train_label:index(1, shuffle):narrow(1, 1, opts.batch_size - remainder), 1)
+    -- shuffle to get dev/train split (10% to dev)
+    -- We organize our data in batches at this split before epoch training.
+    local J = train:size(1)
+    local shuffle = torch.randperm(J):long()
+    train = train:index(1, shuffle)
+    train_label = train_label:index(1, shuffle)
+
+    local num_batches = math.floor(J / opts.batch_size)
+    local num_train_batches = torch.round(num_batches * 0.9)
+
+    local train_size = num_train_batches * opts.batch_size
+    local dev_size = J - train_size
+    dev = train:narrow(1, train_size+1, dev_size)
+    dev_label = train_label:narrow(1, train_size+1, dev_size)
+    train = train:narrow(1, 1, train_size)
+    train_label = train_label:narrow(1, 1, train_size)
+  else
+    print('hi')
+    -- Assume data is already split for us.
   end
-
-  -- shuffle to get dev/train split (10% to dev)
-  -- We organize our data in batches at this split before epoch training.
-  local J = train:size(1)
-  local shuffle = torch.randperm(J):long()
-  train = train:index(1, shuffle)
-  train_label = train_label:index(1, shuffle)
-
-  local num_batches = math.floor(J / opts.batch_size)
-  local num_train_batches = torch.round(num_batches * 0.9)
-
-  local train_size = num_train_batches * opts.batch_size
-  local dev_size = J - train_size
-  local dev = train:narrow(1, train_size+1, dev_size)
-  local dev_label = train_label:narrow(1, train_size+1, dev_size)
-  train = train:narrow(1, 1, train_size)
-  train_label = train_label:narrow(1, 1, train_size)
 
   if opts.debug == 1 then
     print('train size:')
@@ -138,9 +139,11 @@ for fold = 1, opts.folds do
   end
 
   -- get layers
-  local linear = model_builder:get_linear(model)
-  local w2v_layer = model_builder:get_w2v(model)
-  local layers = {linear = linear, w2v = w2v_layer}
+  local linear = model_builder:get_layer(model, 'nn.Linear')
+  local w2v_layer = model_builder:get_layer(model, 'nn.LookupTable')
+  local skip_conv = model_builder:get_layer(model, 'skip_conv')
+  print(skip_conv)
+  local layers = {linear = linear, w2v = w2v_layer, skip_conv = skip_conv}
 
   -- Training loop.
   local best_model = model:clone()

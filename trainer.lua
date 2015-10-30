@@ -18,7 +18,6 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
   _, w2v_grads = layers.w2v:getParameters()
 
   local train_size = train_data:size(1)
-  local batch_size = opts.batch_size
 
   local time = sys.clock()
   local total_err = 0
@@ -35,10 +34,11 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
   end
 
   -- shuffle batches
-  local num_batches = math.floor(train_size / batch_size)
+  local num_batches = math.floor(train_size / opts.batch_size)
   local shuffle = torch.randperm(num_batches)
   for i = 1, shuffle:size(1) do
-    local t = (shuffle[i] - 1) * batch_size + 1
+    local t = (shuffle[i] - 1) * opts.batch_size + 1
+    local batch_size = math.min(opts.batch_size, train_size - t + 1)
 
     -- data samples and labels, in mini batches.
     local inputs = train_data:narrow(1, t, batch_size)
@@ -86,6 +86,8 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
     optim_method(func, params, config)
     -- reset padding embedding to zero
     layers.w2v.weight[1]:zero()
+    -- keep skip kernel at zero
+    layers.skip_conv.weight:select(3,3):zero()
 
     -- Renorm (Euclidean projection to L2 ball)
     local renorm = function(row)

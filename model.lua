@@ -17,7 +17,7 @@ function ModelBuilder.init_cmd(cmd)
   cmd:option('-kernel3', 5, 'Kernel size of convolution 3')
   cmd:option('-dropout_p', 0.5, 'p for dropout')
   cmd:option('-highway_mlp', 0, 'Number of highway MLP layers')
-  cmd:option('-highway_conv_layers', 2, 'Number of highway MLP layers')
+  cmd:option('-highway_conv_layers', 0, 'Number of highway MLP layers')
   cmd:option('-num_classes', 2, 'Number of output classes')
 end
 
@@ -45,18 +45,22 @@ function ModelBuilder:make_net(w2v, opts)
   local layer1 = {}
   for i = 1, #kernels do
     local conv
-    local last_conv
     local conv_layer
     local max_time
     if opts.cudnn == 1 then
-      conv = HighwayConv.conv(opts.vec_size, opts.max_sent, kernels[i], opts.highway_conv_layers)
       last_conv = cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, kernels[i])
 
-      conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kernels[i]+1, true)(
-        last_conv(nn.Reshape(1, opts.max_sent, opts.vec_size, true)(conv(lookup_layer))))
-      --conv_layer = conv(nn.Reshape(1, -1, opts.vec_size, true)(lookup_layer))
-      --max_time = nn.Max(3)(cudnn.ReLU(conv_layer))
-      max_time = nn.Max(3)(conv_layer)
+      if opts.highway_conv_layers > 0 then
+        local highway_conv = HighwayConv.conv(opts.vec_size, opts.max_sent, kernels[i], opts.highway_conv_layers)
+        conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kernels[i]+1, true)(
+          last_conv(nn.Reshape(1, opts.max_sent, opts.vec_size, true)(
+          highway_conv(lookup_layer))))
+        max_time = nn.Max(3)(conv_layer)
+      else
+        conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kernels[i]+1, true)(last_conv(nn.Reshape(1, opts.max_sent, opts.vec_size, true)(lookup_layer)))
+        max_time = nn.Max(3)(cudnn.ReLU()(conv_layer))
+      end
+
     else
       conv = nn.TemporalConvolution(opts.vec_size, opts.num_feat_maps, kernels[i])
       conv_layer = conv(lookup_layer)
@@ -69,8 +73,19 @@ function ModelBuilder:make_net(w2v, opts)
     table.insert(layer1, max_time)
   end
 
+  -- skip kernel
+  local kern_size = opts.kernel3
+  local skip_conv = cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, kern_size)
+  skip_conv.name = 'skip_conv'
+  skip_conv.weight:uniform(-0.01, 0.01)
+  -- skip center for now. kernel size 5
+  skip_conv.weight:select(3,3):zero()
+  skip_conv.bias:zero()
+  local skip_conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kern_size+1, true)(skip_conv(nn.Reshape(1, opts.max_sent, opts.vec_size, true)(lookup_layer)))
+  table.insert(layer1, nn.Max(3)(cudnn.ReLU()(skip_conv_layer)))
+
   local conv_layer_concat
-  if #kernels > 1 then
+  if #layer1 > 1 then
     conv_layer_concat = nn.JoinTable(2)(layer1)
   else
     conv_layer_concat = layer1[1]
@@ -79,12 +94,12 @@ function ModelBuilder:make_net(w2v, opts)
   local last_layer = conv_layer_concat
   if opts.highway_mlp > 0 then
     -- use highway layers
-    local highway = HighwayMLP.mlp((#kernels) * opts.num_feat_maps, opts.highway_layers)
+    local highway = HighwayMLP.mlp((#layer1) * opts.num_feat_maps, opts.highway_layers)
     last_layer = highway(conv_layer_concat)
   end
 
   -- simple MLP layer
-  local linear = nn.Linear((#kernels) * opts.num_feat_maps, opts.num_classes)
+  local linear = nn.Linear((#layer1) * opts.num_feat_maps, opts.num_classes)
   linear.weight:normal():mul(0.01)
   linear.bias:zero()
 
@@ -100,28 +115,16 @@ function ModelBuilder:make_net(w2v, opts)
   return model
 end
 
-function ModelBuilder:get_linear(model)
-  local linear
+function ModelBuilder:get_layer(model, name)
+  local named_layer
   function get_layer(layer)
-    if torch.typename(layer) == 'nn.Linear' then
-      linear = layer
+    if torch.typename(layer) == name or layer.name == name then
+      named_layer = layer
     end
   end
 
   model:apply(get_layer)
-  return linear
-end
-
-function ModelBuilder:get_w2v(model)
-  local w2v
-  function get_layer(layer)
-    if torch.typename(layer) == 'nn.LookupTable' then
-      w2v = layer
-    end
-  end
-
-  model:apply(get_layer)
-  return w2v
+  return named_layer
 end
 
 return ModelBuilder
