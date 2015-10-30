@@ -47,3 +47,5 @@ luac.out
 
 # ignore results
 results
+#ignore data
+data
