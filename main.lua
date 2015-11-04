@@ -25,6 +25,7 @@ cmd:option('-debug', 0, 'print debugging info including timing, confusions')
 
 cmd:option('-has_test', 0, 'If data has test, we use it. Otherwise, we use CV on folds')
 cmd:option('-has_dev', 0, 'If data has dev, we use it, otherwise we split from train')
+cmd:option('-zero_indexing', 0, 'If data is zero indexed')
 
 trainer.init_cmd(cmd)
 model_builder.init_cmd(cmd)
@@ -84,14 +85,13 @@ local fold_dev_scores = {}
 local fold_test_scores = {}
 
 -- shuffle data
-local data = {train, dev, test}
-local data_label = {train_label, dev_label, test_label}
-for i = 1, #data do
-  if not data[i] == nil then
-    local shuffle = torch.randperm(data[i]:size(1)):long()
-    data[i] = data[i]:index(1, shuffle)
-    data_label[i] = data_label[i]:index(1, shuffle)
-  end
+local shuffle = torch.randperm(train:size(1)):long()
+train = train:index(1, shuffle)
+train_label = train_label:index(1, shuffle)
+
+if opts.zero_indexing == 1 then
+  train:add(1)
+  train_label:add(1)
 end
 
 local best_model -- save best model
