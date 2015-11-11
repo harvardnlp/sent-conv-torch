@@ -49,16 +49,16 @@ function ModelBuilder:make_net(w2v, opts)
     local conv_layer
     local max_time
     if opts.cudnn == 1 then
-      last_conv = cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, kernels[i])
+      conv = cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, kernels[i])
 
       if opts.highway_conv_layers > 0 then
         local highway_conv = HighwayConv.conv(opts.vec_size, opts.max_sent, kernels[i], opts.highway_conv_layers)
         conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kernels[i]+1, true)(
-          last_conv(nn.Reshape(1, opts.max_sent, opts.vec_size, true)(
+          conv(nn.Reshape(1, opts.max_sent, opts.vec_size, true)(
           highway_conv(lookup_layer))))
         max_time = nn.Max(3)(conv_layer)
       else
-        conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kernels[i]+1, true)(last_conv(nn.Reshape(1, opts.max_sent, opts.vec_size, true)(lookup_layer)))
+        conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kernels[i]+1, true)(conv(nn.Reshape(1, opts.max_sent, opts.vec_size, true)(lookup_layer)))
         max_time = nn.Max(3)(cudnn.ReLU()(conv_layer))
       end
 
@@ -69,8 +69,8 @@ function ModelBuilder:make_net(w2v, opts)
       max_time = nn.Max(2)(nn.ReLU()(conv_layer)) -- max over time
     end
 
-    last_conv.weight:uniform(-0.01, 0.01)
-    last_conv.bias:zero()
+    conv.weight:uniform(-0.01, 0.01)
+    conv.bias:zero()
     table.insert(layer1, max_time)
   end
 
