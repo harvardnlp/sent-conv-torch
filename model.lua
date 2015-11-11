@@ -15,6 +15,7 @@ function ModelBuilder.init_cmd(cmd)
   cmd:option('-kernel1', 3, 'Kernel size of convolution 1')
   cmd:option('-kernel2', 4, 'Kernel size of convolution 2')
   cmd:option('-kernel3', 5, 'Kernel size of convolution 3')
+  cmd:option('-skip_kernel', 0, 'Use skip kernel')
   cmd:option('-dropout_p', 0.5, 'p for dropout')
   cmd:option('-highway_mlp', 0, 'Number of highway MLP layers')
   cmd:option('-highway_conv_layers', 0, 'Number of highway MLP layers')
@@ -73,16 +74,18 @@ function ModelBuilder:make_net(w2v, opts)
     table.insert(layer1, max_time)
   end
 
-  -- skip kernel
-  local kern_size = opts.kernel3
-  local skip_conv = cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, kern_size)
-  skip_conv.name = 'skip_conv'
-  skip_conv.weight:uniform(-0.01, 0.01)
-  -- skip center for now. kernel size 5
-  skip_conv.weight:select(3,3):zero()
-  skip_conv.bias:zero()
-  local skip_conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kern_size+1, true)(skip_conv(nn.Reshape(1, opts.max_sent, opts.vec_size, true)(lookup_layer)))
-  table.insert(layer1, nn.Max(3)(cudnn.ReLU()(skip_conv_layer)))
+  if opts.skip_kernel > 0 then
+    -- skip kernel
+    local kern_size = 5 -- fix for now
+    local skip_conv = cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, kern_size)
+    skip_conv.name = 'skip_conv'
+    skip_conv.weight:uniform(-0.01, 0.01)
+    -- skip center for now
+    skip_conv.weight:select(3,3):zero()
+    skip_conv.bias:zero()
+    local skip_conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kern_size+1, true)(skip_conv(nn.Reshape(1, opts.max_sent, opts.vec_size, true)(lookup_layer)))
+    table.insert(layer1, nn.Max(3)(cudnn.ReLU()(skip_conv_layer)))
+  end
 
   local conv_layer_concat
   if #layer1 > 1 then

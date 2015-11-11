@@ -66,7 +66,7 @@ def load_data(pos_fname, neg_fname, dataset):
   pos_data = []
   neg_data = []
 
-  extra_padding = 7
+  extra_padding = 4
   for data, file in zip([pos_data, neg_data], [pos_file, neg_file]):
     for line in file:
         words = line_to_words(line, dataset)
@@ -110,7 +110,7 @@ def load_sst_data(dataset):
   test = []
   test_label = []
 
-  extra_padding = 7
+  extra_padding = 4
   for data, label, f in zip([dev, train, test], [dev_label, train_label, test_label], [f_dev, f_train, f_test]):
     for line in f:
         words = line_to_words(line, dataset)
@@ -146,7 +146,7 @@ def load_trec_data(dataset='TREC'):
   test = []
   test_label = []
 
-  extra_padding = 7
+  extra_padding = 4
   c = {'DESC': 1, 'ENTY': 2, 'ABBR': 3, 'HUM': 4, 'LOC': 5, 'NUM': 6}
   for data, label, f in zip([train, test], [train_label, test_label], [f_train, f_test]):
     for line in f:

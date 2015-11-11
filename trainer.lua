@@ -89,8 +89,10 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
     optim_method(func, params, config)
     -- reset padding embedding to zero
     layers.w2v.weight[1]:zero()
-    -- keep skip kernel at zero
-    layers.skip_conv.weight:select(3,3):zero()
+    if opts.skip_kernel > 0 then
+      -- keep skip kernel at zero
+      layers.skip_conv.weight:select(3,3):zero()
+    end
 
     -- Renorm (Euclidean projection to L2 ball)
     local renorm = function(row)

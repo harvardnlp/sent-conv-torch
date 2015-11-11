@@ -51,12 +51,7 @@ local dev, dev_label
 
 print('loading data...')
 local f = hdf5.open(opts.data, 'r')
-if opts.has_test == 1 then
-  test = f:read('test'):all()
-  test_label = f:read('test_label'):all()
-  train = f:read('train'):all()
-  train_label = f:read('train_label'):all()
-end
+local w2v = f:read('w2v'):all()
 if opts.has_dev == 1 then
   test = f:read('test'):all()
   test_label = f:read('test_label'):all()
@@ -64,41 +59,48 @@ if opts.has_dev == 1 then
   train_label = f:read('train_label'):all()
   dev = f:read('dev'):all()
   dev_label = f:read('dev_label'):all()
-end
 
+  print(test:size())
+  print(train:size())
+  print(dev:size())
+elseif opts.has_test == 1 then
+  test = f:read('test'):all()
+  test_label = f:read('test_label'):all()
+  train = f:read('train'):all()
+  train_label = f:read('train_label'):all()
+else
 -- Need CV split
-if opts.has_dev == 0 and opts.has_test == 0 then
   train = f:read('data'):all()
   train_label = f:read('data_label'):all()
 end
-local w2v = f:read('w2v'):all()
 print('data loaded!')
 
 opts.vocab_size = w2v:size(1)
-print('vocab size: ' .. opts.vocab_size)
-
 opts.max_sent = train:size(2)
-print('data size:')
-print(train:size())
-
-local fold_dev_scores = {}
-local fold_test_scores = {}
-
--- shuffle data
-local shuffle = torch.randperm(train:size(1)):long()
-train = train:index(1, shuffle)
-train_label = train_label:index(1, shuffle)
+print('vocab size: ' .. opts.vocab_size)
 
 if opts.zero_indexing == 1 then
   train:add(1)
   train_label:add(1)
+  test:add(1)
+  test_label:add(1)
+  dev:add(1)
+  dev_label:add(1)
 end
 
-local best_model -- save best model
-if opts.has_test == 1 then
+-- shuffle data
+--local shuffle = torch.randperm(train:size(1)):long()
+--train = train:index(1, shuffle)
+--train_label = train_label:index(1, shuffle)
+
+if opts.has_test == 1 or opts.has_dev == 1 then
   -- don't do CV if we have a test set
   opts.folds = 1
 end
+
+local best_model -- save best model
+local fold_dev_scores = {}
+local fold_test_scores = {}
 for fold = 1, opts.folds do
   local fold_time = sys.clock()
 
@@ -158,8 +160,10 @@ for fold = 1, opts.folds do
   -- get layers
   local linear = model_builder:get_layer(model, 'nn.Linear')
   local w2v_layer = model_builder:get_layer(model, 'nn.LookupTable')
-  local skip_conv = model_builder:get_layer(model, 'skip_conv')
-  print(skip_conv)
+  if opts.skip_kernel > 0 then
+    local skip_conv = model_builder:get_layer(model, 'skip_conv')
+    print(skip_conv)
+  end
   local layers = {linear = linear, w2v = w2v_layer, skip_conv = skip_conv}
 
   -- Training loop.
