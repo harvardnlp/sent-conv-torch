@@ -33,13 +33,11 @@ cmd:text()
 
 -- parse arguments
 local opts = cmd:parse(arg)
---torch.manualSeed(opts.seed)
 
--- Currently only adadelta allowed
 local optim_method
 if opts.optim_method == 'adadelta' then
   --optim_method = optim.adadelta
-  optim_method = Trainer.adadelta
+  optim_method = optim.adadelta
 elseif opts.optim_method == 'adam' then
   optim_method = optim.adam
 end
@@ -60,9 +58,11 @@ if opts.has_dev == 1 then
   dev = f:read('dev'):all()
   dev_label = f:read('dev_label'):all()
 
-  print(test:size())
-  print(train:size())
-  print(dev:size())
+  if opts.debug == 1 then
+    print(test:size())
+    print(train:size())
+    print(dev:size())
+  end
 elseif opts.has_test == 1 then
   test = f:read('test'):all()
   test_label = f:read('test_label'):all()
@@ -76,8 +76,10 @@ end
 print('data loaded!')
 
 opts.vocab_size = w2v:size(1)
+opts.vec_size = w2v:size(2)
 opts.max_sent = train:size(2)
 print('vocab size: ' .. opts.vocab_size)
+print('vec size: ' .. opts.vec_size)
 
 if opts.zero_indexing == 1 then
   train:add(1)
@@ -87,11 +89,6 @@ if opts.zero_indexing == 1 then
   dev:add(1)
   dev_label:add(1)
 end
-
--- shuffle data
---local shuffle = torch.randperm(train:size(1)):long()
---train = train:index(1, shuffle)
---train_label = train_label:index(1, shuffle)
 
 if opts.has_test == 1 or opts.has_dev == 1 then
   -- don't do CV if we have a test set
@@ -174,8 +171,9 @@ for fold = 1, opts.folds do
   for epoch = 1, opts.num_epochs do
     local epoch_time = sys.clock()
 
+    -- Train
     local train_err = trainer:train(train, train_label, model, criterion, optim_method, layers, opts)
-
+    -- Dev
     local dev_err = trainer:test(dev, dev_label, model, criterion, opts)
     if dev_err > best_err then
       best_model = model:clone()
