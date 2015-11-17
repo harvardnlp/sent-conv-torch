@@ -69,8 +69,8 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
 
       -- track errors and confusion
       total_err = total_err + err * batch_size
-      for i = 1, batch_size do
-        confusion:add(outputs[i], targets[i])
+      for j = 1, batch_size do
+        confusion:add(outputs[j], targets[j])
       end
 
       -- compute gradients
@@ -97,15 +97,13 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
     -- Renorm (Euclidean projection to L2 ball)
     local renorm = function(row)
       local n = row:norm()
-      if (n > opts.L2s) then
-        row:mul(opts.L2s):div(1e-7 + n)
-      end
+      row:mul(opts.L2s):div(1e-7 + n)
     end
 
     -- renormalize linear row weights
     local w = layers.linear.weight
-    for i = 1, w:size(1) do
-      renorm(w[i])
+    for j = 1, w:size(1) do
+      renorm(w[j])
     end
   end
 
