@@ -32,7 +32,7 @@ function ModelBuilder:make_net(w2v, opts)
 
   local lookup = nn.LookupTable(opts.vocab_size, opts.vec_size)
   if opts.model_type == 'static' or opts.model_type == 'nonstatic' then
-    lookup.weight = w2v
+    lookup.weight:copy(w2v)
   else
     lookup.weight:uniform(-0.25, 0.25)
   end

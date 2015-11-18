@@ -69,7 +69,7 @@ elseif opts.has_test == 1 then
   train = f:read('train'):all()
   train_label = f:read('train_label'):all()
 else
--- Need CV split
+  -- Need CV split
   train = f:read('data'):all()
   train_label = f:read('data_label'):all()
 end
@@ -84,10 +84,6 @@ print('vec size: ' .. opts.vec_size)
 if opts.zero_indexing == 1 then
   train:add(1)
   train_label:add(1)
-  test:add(1)
-  test_label:add(1)
-  dev:add(1)
-  dev_label:add(1)
 end
 
 if opts.has_test == 1 or opts.has_dev == 1 then
@@ -134,12 +130,12 @@ for fold = 1, opts.folds do
     train_label = train_label:narrow(1, 1, train_size)
   end
 
-  if opts.debug == 1 then
-    print('train size:')
-    print(train:size())
-    print('dev size:')
-    print(dev:size())
-  end
+  print('train size:')
+  print(train:size())
+  print('dev size:')
+  print(dev:size())
+  print('test size:')
+  print(test:size())
 
   -- build model
   local model = model_builder:make_net(w2v, opts)
@@ -168,11 +164,13 @@ for fold = 1, opts.folds do
   local best_epoch = 1
   local best_err = 0.0
 
+  -- Gradient descent state should persist over epochs
+  local state = {}
   for epoch = 1, opts.num_epochs do
     local epoch_time = sys.clock()
 
     -- Train
-    local train_err = trainer:train(train, train_label, model, criterion, optim_method, layers, opts)
+    local train_err = trainer:train(train, train_label, model, criterion, optim_method, layers, state, opts)
     -- Dev
     local dev_err = trainer:test(dev, dev_label, model, criterion, opts)
     if dev_err > best_err then

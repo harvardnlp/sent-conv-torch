@@ -11,7 +11,7 @@ function Trainer.init_cmd(cmd)
 end
 
 -- Perform one epoch of training.
-function Trainer:train(train_data, train_labels, model, criterion, optim_method, layers, opts)
+function Trainer:train(train_data, train_labels, model, criterion, optim_method, layers, state, opts)
   model:training()
 
   params, grads = model:getParameters()
@@ -86,7 +86,7 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
     end
 
     -- gradient descent
-    optim_method(func, params, config)
+    optim_method(func, params, config, state)
     -- reset padding embedding to zero
     layers.w2v.weight[1]:zero()
     if opts.skip_kernel > 0 then
