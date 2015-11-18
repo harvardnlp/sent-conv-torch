@@ -14,9 +14,6 @@ end
 function Trainer:train(train_data, train_labels, model, criterion, optim_method, layers, state, opts)
   model:training()
 
-  params, grads = model:getParameters()
-  _, w2v_grads = layers.w2v:getParameters()
-
   local train_size = train_data:size(1)
 
   local time = sys.clock()

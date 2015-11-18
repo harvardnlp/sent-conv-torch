@@ -43,6 +43,7 @@ elseif opts.optim_method == 'adam' then
 end
 
 -- Read HDF5 training data
+local data, data_label
 local test, test_label
 local train, train_label
 local dev, dev_label
@@ -70,23 +71,27 @@ elseif opts.has_test == 1 then
   train_label = f:read('train_label'):all()
 else
   -- Need CV split
-  train = f:read('data'):all()
-  train_label = f:read('data_label'):all()
+  data = f:read('data'):all()
+  data_label = f:read('data_label'):all()
 end
 print('data loaded!')
 
 opts.vocab_size = w2v:size(1)
 opts.vec_size = w2v:size(2)
-opts.max_sent = train:size(2)
+if data ~= nil then
+  opts.max_sent = data:size(2)
+else
+  opts.max_sent = train:size(2)
+end
 print('vocab size: ' .. opts.vocab_size)
 print('vec size: ' .. opts.vec_size)
 
 if opts.zero_indexing == 1 then
-  train:add(1)
-  train_label:add(1)
+  data:add(1)
+  data_label:add(1)
 end
 
-if opts.has_test == 1 or opts.has_dev == 1 then
+if opts.has_test == 1 then
   -- don't do CV if we have a test set
   opts.folds = 1
 end
@@ -102,16 +107,17 @@ for fold = 1, opts.folds do
 
   if opts.has_test == 0 then
     -- make train/test data (90/10 split for train/test)
-    local N = train:size(1)
+    local N = data:size(1)
     local i_start = math.floor((fold - 1) * 0.1 * N + 1)
     local i_end = math.floor(fold * 0.1 * N)
-    test = train:narrow(1, i_start, i_end - i_start + 1)
-    test_label = train_label:narrow(1, i_start, i_end - i_start + 1)
-    train = torch.cat(train:narrow(1, 1, i_start), train:narrow(1, i_end, N - i_end + 1), 1)
-    train_label = torch.cat(train_label:narrow(1, 1, i_start), train_label:narrow(1, i_end, N - i_end + 1), 1)
+    test = data:narrow(1, i_start, i_end - i_start + 1)
+    test_label = data_label:narrow(1, i_start, i_end - i_start + 1)
+    train = torch.cat(data:narrow(1, 1, i_start), data:narrow(1, i_end, N - i_end + 1), 1)
+    train_label = torch.cat(data_label:narrow(1, 1, i_start), data_label:narrow(1, i_end, N - i_end + 1), 1)
   end
 
   if opts.has_dev == 0 then
+    -- Run if we don't have dev (we may or may not have test)
     -- shuffle to get dev/train split (10% to dev)
     -- We organize our data in batches at this split before epoch training.
     local J = train:size(1)
@@ -130,12 +136,12 @@ for fold = 1, opts.folds do
     train_label = train_label:narrow(1, 1, train_size)
   end
 
-  print('train size:')
-  print(train:size())
-  print('dev size:')
-  print(dev:size())
-  print('test size:')
-  print(test:size())
+  --print('train size:')
+  --print(train:size())
+  --print('dev size:')
+  --print(dev:size())
+  --print('test size:')
+  --print(test:size())
 
   -- build model
   local model = model_builder:make_net(w2v, opts)
@@ -146,8 +152,8 @@ for fold = 1, opts.folds do
   if opts.cudnn == 1 then
     require 'cutorch'
     --cutorch.setDevice(0)
-    model:cuda()
-    criterion:cuda()
+    model = model:cuda()
+    criterion = criterion:cuda()
   end
 
   -- get layers
@@ -158,6 +164,10 @@ for fold = 1, opts.folds do
     print(skip_conv)
   end
   local layers = {linear = linear, w2v = w2v_layer, skip_conv = skip_conv}
+
+  -- Call getParameters once
+  params, grads = model:getParameters()
+  --_, w2v_grads = layers.w2v:getParameters()
 
   -- Training loop.
   best_model = model:clone()
