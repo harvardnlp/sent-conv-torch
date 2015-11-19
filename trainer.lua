@@ -76,7 +76,7 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
 
       if opts.model_type == 'static' then
         -- don't update embeddings for static model
-        w2v_grads:zero()
+        layers.w2v.gradWeight:zero()
       end
 
       return err, grads
