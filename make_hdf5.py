@@ -28,9 +28,12 @@ def load_bin_vec(fname, vocab):
     return word_vecs
 
 def line_to_words(line, dataset):
-  trec = (dataset == 'TREC')
-  clean_line = clean_str(line.strip(), trec)
+  if dataset == 'SST1' or dataset == 'SST2':
+    clean_line = clean_str_sst(line.strip())
+  else:
+    clean_line = clean_str(line.strip(), dataset == 'TREC')
   words = clean_line.split(' ')
+
   if dataset == 'SST1' or dataset == 'SST2':
     words = words[1:]
   elif dataset == 'TREC':
@@ -98,7 +101,7 @@ def load_sst_data(dataset):
     f_prefix = f_prefix + 'stsa.binary'
 
   dev_name = f_prefix + '.dev'
-  train_name = f_prefix + '.train'
+  train_name = f_prefix + '.phrases.train'
   test_name = f_prefix + '.test'
   max_sent_len, word_to_idx = get_vocab([dev_name, train_name, test_name], dataset)
 
@@ -192,6 +195,14 @@ def clean_str(string, TREC=False):
   string = re.sub(r"\?", " ? ", string) 
   string = re.sub(r"\s{2,}", " ", string)    
   return string.strip().lower() if TREC else string.strip()
+
+def clean_str_sst(string):
+  """
+  Tokenization/string cleaning for the SST dataset
+  """
+  string = re.sub(r"[^A-Za-z0-9(),!?\'\`]", " ", string)   
+  string = re.sub(r"\s{2,}", " ", string)    
+  return string.strip().lower()
 
 if __name__ == '__main__':
   if len(sys.argv) < 2:

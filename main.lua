@@ -81,7 +81,6 @@ else
   data = f:read('data'):all()
   data_label = f:read('data_label'):all()
 end
-print(data:narrow(1, 1, 10))
 print('data loaded!')
 
 opts.vocab_size = w2v:size(1)
