@@ -71,8 +71,11 @@ def load_data(pos_fname, neg_fname, dataset):
     for line in file:
         words = line_to_words(line, dataset)
         sent = [word_to_idx[word] for word in words]
+        # end padding
         if len(sent) < max_sent_len + extra_padding:
             sent.extend([1] * (max_sent_len + extra_padding - len(sent)))
+        # start padding
+        sent = [1]*extra_padding + sent
 
         data.append(sent)
 
@@ -116,8 +119,11 @@ def load_sst_data(dataset):
         words = line_to_words(line, dataset)
         y = int(line[0]) + 1
         sent = [word_to_idx[word] for word in words]
+        # end padding
         if len(sent) < max_sent_len + extra_padding:
             sent.extend([1] * (max_sent_len + extra_padding - len(sent)))
+        # start padding
+        sent = [1]*extra_padding + sent
 
         data.append(sent)
         label.append(y)
@@ -153,8 +159,11 @@ def load_trec_data(dataset='TREC'):
         words = line_to_words(line, dataset)
         y = c[line.split(':')[0]]
         sent = [word_to_idx[word] for word in words]
+        # start padding
         if len(sent) < max_sent_len + extra_padding:
             sent.extend([1] * (max_sent_len + extra_padding - len(sent)))
+        # end padding
+        sent = [1]*extra_padding + sent
 
         data.append(sent)
         label.append(y)

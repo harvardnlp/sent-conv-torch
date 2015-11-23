@@ -42,6 +42,13 @@ elseif opts.optim_method == 'adam' then
   optim_method = optim.adam
 end
 
+torch.manualSeed(3435)
+if opts.cudnn == 1 then
+  require 'cutorch'
+  cutorch.manualSeedAll(3435)
+  --cutorch.setDevice(0)
+end
+
 -- Read HDF5 training data
 local data, data_label
 local test, test_label
@@ -74,6 +81,7 @@ else
   data = f:read('data'):all()
   data_label = f:read('data_label'):all()
 end
+print(data:narrow(1, 1, 10))
 print('data loaded!')
 
 opts.vocab_size = w2v:size(1)
@@ -150,8 +158,6 @@ for fold = 1, opts.folds do
 
   -- move to GPU
   if opts.cudnn == 1 then
-    require 'cutorch'
-    --cutorch.setDevice(0)
     model = model:cuda()
     criterion = criterion:cuda()
   end
