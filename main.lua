@@ -18,7 +18,7 @@ cmd:option('-num_epochs', 25, 'Number of training epochs')
 cmd:option('-model_type', 'rand', 'Model type. Options: rand (randomly initialized word embeddings), static (pre-trained embeddings from word2vec, static during learning), nonstatic (pre-trained embeddings, tuned during learning), multichannel (TODO)')
 cmd:option('-data', 'MR.hdf5', 'Training data and word2vec data')
 cmd:option('-cudnn', 0, 'Use cudnn and GPUs if set to 1, otherwise set to 0')
-cmd:option('-seed', 35392, 'random seed')
+cmd:option('-seed', 3435, 'random seed, set -1 for actual random')
 cmd:option('-folds', 10, 'number of folds to use. max 10')
 cmd:option('-learn_start', 0, 'learned start padding')
 cmd:option('-debug', 0, 'print debugging info including timing, confusions')
@@ -42,10 +42,14 @@ elseif opts.optim_method == 'adam' then
   optim_method = optim.adam
 end
 
-torch.manualSeed(3435)
+if opts.seed ~= -1 then
+  torch.manualSeed(opts.seed)
+end
 if opts.cudnn == 1 then
   require 'cutorch'
-  cutorch.manualSeedAll(3435)
+  if opts.seed ~= -1 then
+    cutorch.manualSeedAll(opts.seed)
+  end
   --cutorch.setDevice(0)
 end
 
