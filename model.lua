@@ -30,16 +30,31 @@ function ModelBuilder:make_net(w2v, opts)
 
   local input = nn.Identity()()
 
-  local lookup = nn.LookupTable(opts.vocab_size, opts.vec_size)
-  if opts.model_type == 'static' or opts.model_type == 'nonstatic' then
-    lookup.weight:copy(w2v)
+  local lookup
+  if opts.model_type == 'multichannel' then
+    local channels = {}
+    for i = 1, 2 do
+      local chan = nn.LookupTable(opts.vocab_size, opts.vec_size)
+      chan.weight:copy(w2v)
+      chan.weight[1]:zero()
+      chan.name = 'channel' .. i
+      chan = nn.Reshape(1, opts.max_sent, opts.vec_size, true)(chan(input))
+      table.insert(channels, chan)
+    end
+    lookup = nn.JoinTable(2)(channels)
   else
-    lookup.weight:uniform(-0.25, 0.25)
-  end
-  -- padding should always be 0
-  lookup.weight[1]:zero()
+    lookup = nn.LookupTable(opts.vocab_size, opts.vec_size)
+    if opts.model_type == 'static' or opts.model_type == 'nonstatic' then
+      lookup.weight:copy(w2v)
+    else
+      -- rand
+      lookup.weight:uniform(-0.25, 0.25)
+    end
+    -- padding should always be 0
+    lookup.weight[1]:zero()
 
-  local lookup_layer = lookup(input)
+    lookup = lookup(input)
+  end
 
   -- kernels is an array of kernel sizes
   local kernels = {opts.kernel1, opts.kernel2, opts.kernel3}
@@ -49,23 +64,36 @@ function ModelBuilder:make_net(w2v, opts)
     local conv_layer
     local max_time
     if opts.cudnn == 1 then
-      conv = cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, kernels[i])
-
-      if opts.highway_conv_layers > 0 then
-        local highway_conv = HighwayConv.conv(opts.vec_size, opts.max_sent, kernels[i], opts.highway_conv_layers)
-        conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kernels[i]+1, true)(
-          conv(nn.Reshape(1, opts.max_sent, opts.vec_size, true)(
-          highway_conv(lookup_layer))))
-        max_time = nn.Max(3)(conv_layer)
-      else
-        conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kernels[i]+1, true)(conv(nn.Reshape(1, opts.max_sent, opts.vec_size, true)(lookup_layer)))
+      if opts.model_type == 'multichannel' then
+        conv = cudnn.SpatialConvolution(2, opts.num_feat_maps, opts.vec_size, kernels[i])
+        conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kernels[i]+1, true)(conv(lookup))
         max_time = nn.Max(3)(cudnn.ReLU()(conv_layer))
+      else
+        conv = cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, kernels[i])
+
+        if opts.highway_conv_layers > 0 then
+          -- Highway conv layers
+          local highway_conv = HighwayConv.conv(opts.vec_size, opts.max_sent, kernels[i], opts.highway_conv_layers)
+          conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kernels[i]+1, true)(
+            conv(nn.Reshape(1, opts.max_sent, opts.vec_size, true)(
+            highway_conv(lookup))))
+          max_time = nn.Max(3)(cudnn.ReLU()(conv_layer))
+        else
+          conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kernels[i]+1, true)(conv(nn.Reshape(1, opts.max_sent, opts.vec_size, true)(lookup)))
+          max_time = nn.Max(3)(cudnn.ReLU()(conv_layer))
+        end
       end
 
     else
-      conv = nn.TemporalConvolution(opts.vec_size, opts.num_feat_maps, kernels[i])
-      conv_layer = conv(lookup_layer)
-      max_time = nn.Max(2)(nn.ReLU()(conv_layer)) -- max over time
+      if opts.model_type == 'multichannel' then
+        conv = nn.SpatialConvolution(2, opts.num_feat_maps, opts.vec_size, kernels[i])
+        conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kernels[i]+1, true)(conv(lookup))
+        max_time = nn.Max(3)(nn.ReLU()(conv_layer))
+      else
+        conv = nn.TemporalConvolution(opts.vec_size, opts.num_feat_maps, kernels[i])
+        conv_layer = conv(lookup)
+        max_time = nn.Max(2)(nn.ReLU()(conv_layer)) -- max over time
+      end
     end
 
     conv.weight:uniform(-0.01, 0.01)
@@ -82,7 +110,7 @@ function ModelBuilder:make_net(w2v, opts)
     -- skip center for now
     skip_conv.weight:select(3,3):zero()
     skip_conv.bias:zero()
-    local skip_conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kern_size+1, true)(skip_conv(nn.Reshape(1, opts.max_sent, opts.vec_size, true)(lookup_layer)))
+    local skip_conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kern_size+1, true)(skip_conv(nn.Reshape(1, opts.max_sent, opts.vec_size, true)(lookup)))
     table.insert(layer1, nn.Max(3)(cudnn.ReLU()(skip_conv_layer)))
   end
 

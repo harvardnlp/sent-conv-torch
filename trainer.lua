@@ -77,6 +77,9 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
       if opts.model_type == 'static' then
         -- don't update embeddings for static model
         layers.w2v.gradWeight:zero()
+      elseif opts.model_type == 'multichannel' then
+        -- keep one embedding channel static
+        layers.chan1.gradWeight:zero()
       end
 
       return err, grads

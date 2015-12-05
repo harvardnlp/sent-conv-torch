@@ -16,7 +16,7 @@ cmd:text('Convolutional net for sentence classification')
 cmd:text()
 cmd:text('Options')
 cmd:option('-num_epochs', 25, 'Number of training epochs')
-cmd:option('-model_type', 'rand', 'Model type. Options: rand (randomly initialized word embeddings), static (pre-trained embeddings from word2vec, static during learning), nonstatic (pre-trained embeddings, tuned during learning), multichannel (TODO)')
+cmd:option('-model_type', 'rand', 'Model type. Options: rand (randomly initialized word embeddings), static (pre-trained embeddings from word2vec, static during learning), nonstatic (pre-trained embeddings, tuned during learning), multichannel (two embedding channels, one static and one nonstatic)')
 cmd:option('-data', 'MR.hdf5', 'Training data and word2vec data')
 cmd:option('-cudnn', 0, 'Use cudnn and GPUs if set to 1, otherwise set to 0')
 cmd:option('-seed', 3435, 'random seed, set -1 for actual random')
@@ -158,12 +158,15 @@ for fold = 1, opts.folds do
   end
 
   -- get layers
-  local linear = model_builder:get_layer(model, 'nn.Linear')
-  local w2v_layer = model_builder:get_layer(model, 'nn.LookupTable')
+  local layers = {}
+  layers['linear'] = model_builder:get_layer(model, 'nn.Linear')
+  layers['w2v'] = model_builder:get_layer(model, 'nn.LookupTable')
   if opts.skip_kernel > 0 then
-    local skip_conv = model_builder:get_layer(model, 'skip_conv')
+    layers['skip_conv'] = model_builder:get_layer(model, 'skip_conv')
   end
-  local layers = {linear = linear, w2v = w2v_layer, skip_conv = skip_conv}
+  if opts.model_type == 'multichannel' then
+    layers['chan1'] = model_builder:get_layer(model, 'channel1')
+  end
 
   -- Call getParameters once
   params, grads = model:getParameters()
