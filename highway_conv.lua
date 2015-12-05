@@ -7,6 +7,7 @@ function HighwayConv.conv(vec_size, max_sent, kernel_size, num_layers, bias, f)
   -- bias = bias for transform gate (default = -2)
   -- f = non-linearity (default = ReLU)
 
+  local reshape1, conv, pad, reshape2
   local output, transform_gate, carry_gate
   local num_layers = num_layers or 1
   local bias = bias or -2
@@ -16,10 +17,10 @@ function HighwayConv.conv(vec_size, max_sent, kernel_size, num_layers, bias, f)
 
   for i = 1, num_layers do        
       -- Reshape for spatial convolution
-    local reshape1 = nn.Reshape(1, max_sent, vec_size, true)
-    local conv = cudnn.SpatialConvolution(1, vec_size, vec_size, kernel_size)
-    local pad = nn.Padding(3,kernel_size-1)
-    local reshape2 = nn.Reshape(max_sent, vec_size, true)
+    reshape1 = nn.Reshape(1, max_sent, vec_size, true)
+    conv = cudnn.SpatialConvolution(1, vec_size, vec_size, kernel_size)
+    pad = nn.Padding(3,kernel_size-1)
+    reshape2 = nn.Reshape(max_sent, vec_size, true)
     conv.weight:uniform(-0.01, 0.01)
     conv.bias:zero()
 

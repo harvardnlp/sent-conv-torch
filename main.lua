@@ -8,6 +8,7 @@ local ModelBuilder = require 'model'
 local trainer = Trainer.new()
 local model_builder = ModelBuilder.new()
 
+-- Flags
 cmd = torch.CmdLine()
 cmd:text()
 cmd:text()
@@ -36,7 +37,6 @@ local opts = cmd:parse(arg)
 
 local optim_method
 if opts.optim_method == 'adadelta' then
-  --optim_method = optim.adadelta
   optim_method = optim.adadelta
 elseif opts.optim_method == 'adam' then
   optim_method = optim.adam
@@ -69,12 +69,6 @@ if opts.has_dev == 1 then
   train_label = f:read('train_label'):all()
   dev = f:read('dev'):all()
   dev_label = f:read('dev_label'):all()
-
-  if opts.debug == 1 then
-    print(test:size())
-    print(train:size())
-    print(dev:size())
-  end
 elseif opts.has_test == 1 then
   test = f:read('test'):all()
   test_label = f:read('test_label'):all()
@@ -94,12 +88,17 @@ if data ~= nil then
 else
   opts.max_sent = train:size(2)
 end
-print('vocab size: ' .. opts.vocab_size)
-print('vec size: ' .. opts.vec_size)
+print('vocab size: ', opts.vocab_size)
+print('vec size: ', opts.vec_size)
 
 if opts.zero_indexing == 1 then
-  data:add(1)
-  data_label:add(1)
+  if data ~= nil then
+    data:add(1)
+    data_label:add(1)
+  else
+    train:add(1)
+    train_label:add(1)
+  end
 end
 
 if opts.has_test == 1 then
@@ -114,7 +113,7 @@ for fold = 1, opts.folds do
   local fold_time = sys.clock()
 
   print()
-  print('==> fold ' .. fold)
+  print('==> fold ', fold)
 
   if opts.has_test == 0 then
     -- make train/test data (90/10 split for train/test)
@@ -147,13 +146,6 @@ for fold = 1, opts.folds do
     train_label = train_label:narrow(1, 1, train_size)
   end
 
-  --print('train size:')
-  --print(train:size())
-  --print('dev size:')
-  --print(dev:size())
-  --print('test size:')
-  --print(test:size())
-
   -- build model
   local model = model_builder:make_net(w2v, opts)
 
@@ -170,13 +162,11 @@ for fold = 1, opts.folds do
   local w2v_layer = model_builder:get_layer(model, 'nn.LookupTable')
   if opts.skip_kernel > 0 then
     local skip_conv = model_builder:get_layer(model, 'skip_conv')
-    print(skip_conv)
   end
   local layers = {linear = linear, w2v = w2v_layer, skip_conv = skip_conv}
 
   -- Call getParameters once
   params, grads = model:getParameters()
-  --_, w2v_grads = layers.w2v:getParameters()
 
   -- Training loop.
   best_model = model:clone()
@@ -200,34 +190,34 @@ for fold = 1, opts.folds do
 
     if opts.debug == 1 then
       print()
-      print('time for one epoch: ' .. ((sys.clock() - epoch_time) * 1000) .. 'ms')
+      print('time for one epoch: ', ((sys.clock() - epoch_time) * 1000), 'ms')
       print('\n')
     end
 
-    print('epoch ' .. epoch .. ', train perf ' .. 100*train_err .. '%, val perf ' .. 100*dev_err .. '%')
+    print('epoch:', epoch, 'train perf:', 100*train_err, '%, val perf ', 100*dev_err, '%')
   end
 
-  print('best dev err: ' .. 100*best_err .. '%, epoch ' .. best_epoch)
+  print('best dev err:', 100*best_err, '%, epoch ', best_epoch)
   local test_err = trainer:test(test, test_label, best_model, criterion, opts)
-  print('test perf ' .. 100*test_err .. '%')
+  print('test perf ', 100*test_err, '%')
 
   table.insert(fold_dev_scores, best_err)
   table.insert(fold_test_scores, test_err)
 
   if opts.debug == 1 then
     print()
-    print('time for one fold: ' .. ((sys.clock() - fold_time) * 1000) .. 'ms')
+    print('time for one fold: ', ((sys.clock() - fold_time) * 1000), 'ms')
     print('\n')
   end
 end
 
 print('dev scores:')
 print(fold_dev_scores)
-print('average dev score: ' .. torch.Tensor(fold_dev_scores):mean())
+print('average dev score: ', torch.Tensor(fold_dev_scores):mean())
 print('test scores:')
 print(fold_test_scores)
-print('average test score: ' .. torch.Tensor(fold_test_scores):mean())
+print('average test score: ', torch.Tensor(fold_test_scores):mean())
 
 local savefile = string.format('results/%s_results', os.date('%Y%m%d_%H%M'))
-print('saving results to ' .. savefile)
+print('saving results to ', savefile)
 torch.save(savefile, { dev_scores = fold_dev_scores, test_scores = fold_test_scores, opts = opts, model = best_model })
