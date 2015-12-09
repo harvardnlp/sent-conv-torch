@@ -38,10 +38,9 @@ function ModelBuilder:make_net(w2v, opts)
       chan.weight:copy(w2v)
       chan.weight[1]:zero()
       chan.name = 'channel' .. i
-      chan = nn.Reshape(1, opts.max_sent, opts.vec_size, true)(chan(input))
-      table.insert(channels, chan)
+      table.insert(channels, chan(input))
     end
-    lookup = nn.JoinTable(2)(channels)
+    lookup = channels
   else
     lookup = nn.LookupTable(opts.vocab_size, opts.vec_size)
     if opts.model_type == 'static' or opts.model_type == 'nonstatic' then
@@ -64,13 +63,18 @@ function ModelBuilder:make_net(w2v, opts)
     local conv_layer
     local max_time
     if opts.cudnn == 1 then
+      conv = cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, kernels[i])
       if opts.model_type == 'multichannel' then
-        conv = cudnn.SpatialConvolution(2, opts.num_feat_maps, opts.vec_size, kernels[i])
-        conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kernels[i]+1, true)(conv(lookup))
+        local lookup_conv = {}
+        for chan = 1, 2 do
+          table.insert(lookup_conv, nn.Reshape(opts.num_feat_maps, opts.max_sent-kernels[i]+1, true)(
+            conv(
+            nn.Reshape(1, opts.max_sent, opts.vec_size, true)(
+            lookup[chan]))))
+        end
+        conv_layer = nn.CAddTable()(lookup_conv)
         max_time = nn.Max(3)(cudnn.ReLU()(conv_layer))
       else
-        conv = cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, kernels[i])
-
         if opts.highway_conv_layers > 0 then
           -- Highway conv layers
           local highway_conv = HighwayConv.conv(opts.vec_size, opts.max_sent, kernels[i], opts.highway_conv_layers)
@@ -79,16 +83,22 @@ function ModelBuilder:make_net(w2v, opts)
             highway_conv(lookup))))
           max_time = nn.Max(3)(cudnn.ReLU()(conv_layer))
         else
-          conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kernels[i]+1, true)(conv(nn.Reshape(1, opts.max_sent, opts.vec_size, true)(lookup)))
+          conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kernels[i]+1, true)(
+            conv(
+            nn.Reshape(1, opts.max_sent, opts.vec_size, true)(
+            lookup)))
           max_time = nn.Max(3)(cudnn.ReLU()(conv_layer))
         end
       end
-
     else
+      conv = nn.TemporalConvolution(opts.vec_size, opts.num_feat_maps, kernels[i])
       if opts.model_type == 'multichannel' then
-        conv = nn.SpatialConvolution(2, opts.num_feat_maps, opts.vec_size, kernels[i])
-        conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kernels[i]+1, true)(conv(lookup))
-        max_time = nn.Max(3)(nn.ReLU()(conv_layer))
+        local lookup_conv = {}
+        for chan = 1,2 do
+          table.insert(lookup_conv, conv(lookup[chan]))
+        end
+        conv_layer = nn.CAddTable()(lookup_conv)
+        max_time = nn.Max(2)(nn.ReLU()(conv_layer)) -- max over time
       else
         conv = nn.TemporalConvolution(opts.vec_size, opts.num_feat_maps, kernels[i])
         conv_layer = conv(lookup)
