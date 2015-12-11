@@ -21,7 +21,6 @@ cmd:option('-data', 'MR.hdf5', 'Training data and word2vec data')
 cmd:option('-cudnn', 0, 'Use cudnn and GPUs if set to 1, otherwise set to 0')
 cmd:option('-seed', 3435, 'random seed, set -1 for actual random')
 cmd:option('-folds', 10, 'number of folds to use. max 10')
-cmd:option('-learn_start', 0, 'learned start padding')
 cmd:option('-debug', 0, 'print debugging info including timing, confusions')
 
 cmd:option('-has_test', 0, 'If data has test, we use it. Otherwise, we use CV on folds')
