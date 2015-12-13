@@ -16,10 +16,10 @@ Results are timestamped and saved to the `results/` directory.
 
 ## Creating datasets
 
-We process the following datasets: `MR, SST-1, SST-2, Subj, TREC, CR, MPQA`.
+We process the following datasets: `MR, SST1, SST2, Subj, TREC, CR, MPQA`.
 All raw training data is located in the `data/` directory. The `SST1, SST2` data have both test and dev sets, and TREC has a test set.
 
-The data takes word2vec embeddings (from `/n/rush_lab/data/GoogleNews-vectors-negative300.bin)`, processes the vocabulary, and outputs a data matrix of vocabulary indices for each sentence.
+The data takes word2vec embeddings (from `/n/rush_lab/data/GoogleNews-vectors-negative300.bin`), processes the vocabulary, and outputs a data matrix of vocabulary indices for each sentence.
 
 Each dataset is packaged into a `.hdf5` file and includes the word2vec embeddings.
 
@@ -43,13 +43,15 @@ A few modifications were made to the model architecture as experiments.
   * we also include highway layers at the convolutional step (which performs multiple convolutions on the resulting feature maps) as an option,
   * we experimented with skip kernels of size 5 (added in parallel with the other kernel sizes)
 
+Results from these experiments are described below in the Results section.
+
 ### Parameters
 
 The following parameters are allowed by the code.
   * `cudnn`: Use GPUs if set to 1, otherwise set to 0
   * `num_epochs`: Number of training epochs.
   * `model_type`: Model architecture, as described above. Options: rand, static, nonstatic, multichannel
-  * `data`: Training dataset to use, including word2vec data
+  * `data`: Training dataset to use, including word2vec data. This should be a `.hdf5` file made with `make_hdf5.py`.
   * `seed`: Random seed, set to -1 for actual randomness
   * `folds`: Number of folds for cross-validation.
   * `has_test`: Set 1 if data has test set
@@ -95,8 +97,9 @@ With 1 highway layer, SST1 achieves a mean score of mean 47.8, stddev 0.857, ove
 
 We ran timing benchmarks on SST1, which has train/dev/test data sizes of 156817/1101/2210. We used a batch size of 50.
 
-// needs work
  | non-GPU | GPU
 --- | --- | ---
-per epoch | 3237 s | 7.57 s
-per batch | 1030 ms | 24.08 ms
+per epoch | 3376 s | 72.0 s
+per batch | 1070 ms | 22.8 ms
+
+From these results, we see that using GPUs achieves almost a 50x speedup on training. This allows much faster tuning of parameters and model experimentation.
