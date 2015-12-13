@@ -16,7 +16,8 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
 
   local train_size = train_data:size(1)
 
-  local time = sys.clock()
+  local timer = torch.Timer()
+  local time = timer:time().real
   local total_err = 0
 
   local classes = {}
@@ -113,7 +114,7 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
   end
 
   -- time taken
-  time = sys.clock() - time
+  time = timer:time().real - time
   time = opts.batch_size * time / train_size
   if opts.debug == 1 then
     print("==> time to learn 1 batch = " .. (time*1000) .. 'ms')

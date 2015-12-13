@@ -109,7 +109,8 @@ local best_model -- save best model
 local fold_dev_scores = {}
 local fold_test_scores = {}
 for fold = 1, opts.folds do
-  local fold_time = sys.clock()
+  local timer = torch.Timer()
+  local fold_time = timer:time().real
 
   print()
   print('==> fold ', fold)
@@ -178,7 +179,7 @@ for fold = 1, opts.folds do
   -- Gradient descent state should persist over epochs
   local state = {}
   for epoch = 1, opts.num_epochs do
-    local epoch_time = sys.clock()
+    local epoch_time = timer:time().real
 
     -- Train
     local train_err = trainer:train(train, train_label, model, criterion, optim_method, layers, state, opts)
@@ -192,7 +193,7 @@ for fold = 1, opts.folds do
 
     if opts.debug == 1 then
       print()
-      print('time for one epoch: ', ((sys.clock() - epoch_time) * 1000), 'ms')
+      print('time for one epoch: ', (timer:time().real - epoch_time) * 1000, 'ms')
       print('\n')
     end
 
@@ -208,7 +209,7 @@ for fold = 1, opts.folds do
 
   if opts.debug == 1 then
     print()
-    print('time for one fold: ', ((sys.clock() - fold_time) * 1000), 'ms')
+    print('time for one fold: ', (timer:time().real - fold_time * 1000), 'ms')
     print('\n')
   end
 end
