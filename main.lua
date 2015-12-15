@@ -49,7 +49,7 @@ if opts.cudnn == 1 then
   if opts.seed ~= -1 then
     cutorch.manualSeedAll(opts.seed)
   end
-  --cutorch.setDevice(0)
+  cutorch.setDevice(1)
 end
 
 -- Read HDF5 training data
