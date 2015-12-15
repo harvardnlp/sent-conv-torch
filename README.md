@@ -99,7 +99,7 @@ We ran timing benchmarks on SST1, which has train/dev/test data sizes of 156817/
 
  | non-GPU | GPU
 --- | --- | ---
-per epoch | 3376 s | 72.0 s
-per batch | 1070 ms | 22.8 ms
+per epoch | 2475 s | 54.0 s
+per batch | 787 ms | 15.6 ms
 
 From these results, we see that using GPUs achieves almost a 50x speedup on training. This allows much faster tuning of parameters and model experimentation.
