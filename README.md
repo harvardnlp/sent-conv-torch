@@ -14,6 +14,12 @@ To run training with GPUs:
 
 Results are timestamped and saved to the `results/` directory.
 
+## Dependencies
+
+The training pipeline requires Python hdf5 (the h5py module) and the following lua packages:
+  * hdf5
+  * cudnn
+
 ## Creating datasets
 
 We process the following datasets: `MR, SST1, SST2, Subj, TREC, CR, MPQA`.
@@ -73,11 +79,17 @@ Model parameters:
   * `highway_conv_layers`: Number of highway convolutional layers (0 for none)
   * `skip_kernel`: Set 1 to use skip kernels
 
+### Output
+
+When training is complete, the code outputs the following table into a file `TIMESTAMP_results.t7`:
+  * `dev_scores` with dev scores,
+  * `test scores` with test scores,
+  * `opts` with model parameters,
+  * `model` with best model (as determined by cross-validation)
+
 ## Results
 
 ### Scores
-
-When training is complete, the binary outputs the following into a file `TIMESTAMP_results` in the `results/` directory:
 
 Dataset | `rand` | `static` | `nonstatic` | `multichannel`
 --- | --- | --- | --- | ---
@@ -103,3 +115,11 @@ per epoch | 2475 s | 54.0 s
 per batch | 787 ms | 15.6 ms
 
 From these results, we see that using GPUs achieves almost a 50x speedup on training. This allows much faster tuning of parameters and model experimentation.
+
+## Relevant publications
+
+Most of this code is based on Yoon's paper and Theano [code](https://github.com/yoonkim/CNN_sentence/). 
+
+    Kim, Y. (2014). Convolutional Neural Networks for Sentence Classification. In Proceedings of the 2014 Conference on Empirical Methods in Natural Language Processing (EMNLP), pp. 1746–1751, Doha, Qatar. Association for Computational Linguistics.
+
+    Srivastava, R. K., Greff, K., & Schmidhuber, J. (2015). Training very deep networks. In Advances in Neural Information Processing Systems (pp. 2368-2376).
