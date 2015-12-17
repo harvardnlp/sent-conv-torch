@@ -11,7 +11,7 @@ function Trainer.init_cmd(cmd)
 end
 
 -- Perform one epoch of training.
-function Trainer:train(train_data, train_labels, model, criterion, optim_method, layers, state, opts)
+function Trainer:train(train_data, train_labels, model, criterion, optim_method, layers, state, params, grads, opts)
   model:training()
 
   local train_size = train_data:size(1)
