@@ -1,8 +1,6 @@
 require 'torch'
 require 'nn'
 require 'nngraph'
-local HighwayMLP = require 'highway_mlp'
-local HighwayConv = require 'highway_conv'
 
 local ModelBuilder = torch.class('ModelBuilder')
 
