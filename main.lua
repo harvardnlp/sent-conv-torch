@@ -1,11 +1,12 @@
 require 'hdf5'
 require 'nn'
 require 'optim'
+require 'lfs'
 
 function main()
   -- Initialize objects
   local Trainer = require 'trainer'
-  local ModelBuilder = require 'model'
+  local ModelBuilder = require 'model.convNN'
   local trainer = Trainer.new()
   local model_builder = ModelBuilder.new()
 
@@ -24,10 +25,13 @@ function main()
   cmd:option('-folds', 10, 'number of folds to use. max 10')
   cmd:option('-debug', 0, 'print debugging info including timing, confusions')
   cmd:option('-gpuid', 1, 'GPU device id to use.')
-  cmd:option('-savefile', '', 'Name of output file, which will hold the trained model, model parameters, and training scores. Empty sets the filename to TIMESTAMP_results')
+  cmd:option('-savefile', '', 'Name of output file, which will hold the trained model, model parameters, and training scores. Default filename is TIMESTAMP_results')
   cmd:option('-has_test', 0, 'If data has test, we use it. Otherwise, we use CV on folds')
   cmd:option('-has_dev', 0, 'If data has dev, we use it, otherwise we split from train')
   cmd:option('-zero_indexing', 0, 'If data is zero indexed')
+
+  -- Training own dataset
+  cmd:option('-train_only', 0, 'Set to 1 to only train model (no testing scores)')
 
   trainer.init_cmd(cmd)
   model_builder.init_cmd(cmd)
@@ -223,11 +227,14 @@ function main()
   print(fold_test_scores)
   print('average test score: ', torch.Tensor(fold_test_scores):mean())
 
+  -- make sure output directory exists
+  if not path.exists('results') then lfs.mkdir('results') end
+
   local savefile
   if opts.savefile ~= '' then
     savefile = opts.savefile
   else
-    savefile = string.format('%s_model.t7', os.date('%Y%m%d_%H%M'))
+    savefile = string.format('results/%s_model.t7', os.date('%Y%m%d_%H%M'))
   end
   print('saving results to ', savefile)
   torch.save(savefile, { dev_scores = fold_dev_scores, test_scores = fold_test_scores, opts = opts, model = best_model })
