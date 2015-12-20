@@ -2,6 +2,7 @@ import numpy as np
 import h5py
 import re
 import sys
+import argparse
 
 def load_bin_vec(fname, vocab):
     """
@@ -31,10 +32,12 @@ def line_to_words(line, dataset):
   if dataset == 'SST1' or dataset == 'SST2':
     clean_line = clean_str_sst(line.strip())
   else:
-    clean_line = clean_str(line.strip(), dataset == 'TREC')
+    clean_line = clean_str(line.strip())
   words = clean_line.split(' ')
 
-  if dataset == 'SST1' or dataset == 'SST2':
+  print words
+
+  if dataset == 'SST1' or dataset == 'SST2' or dataset == 'custom':
     words = words[1:]
   elif dataset == 'TREC':
     words = words[2:]
@@ -88,6 +91,31 @@ def load_data(pos_fname, neg_fname, dataset):
   neg_file.close()
 
   return np.array(pos_data + neg_data, dtype=np.int32), np.array(labels, np.int32), word_to_idx
+
+def load_custom_data(train_fname, test_fname=""):
+  max_sent_len, word_to_idx = get_vocab([train_fname])
+
+  f = open(train_fname, "r")
+
+  data = []
+  label = []
+
+  extra_padding = 4
+  for line in f:
+      words = line_to_words(line, "custom")
+      y = int(line[0]) + 1
+      sent = [word_to_idx[word] for word in words]
+      # end padding
+      if len(sent) < max_sent_len + extra_padding:
+          sent.extend([1] * (max_sent_len + extra_padding - len(sent)))
+      # start padding
+      sent = [1]*extra_padding + sent
+
+      data.append(sent)
+      label.append(y)
+
+  f.close()
+  return np.array(data, dtype=np.int32), np.array(label, dtype=np.int32), word_to_idx
 
 def load_sst_data(dataset):
   """
@@ -176,10 +204,9 @@ def load_trec_data(dataset='TREC'):
 
   return np.array(train, dtype=np.int32), np.array(train_label, dtype=np.int32), np.array(test, dtype=np.int32), np.array(test_label, dtype=np.int32), word_to_idx
 
-def clean_str(string, TREC=False):
+def clean_str(string):
   """
   Tokenization/string cleaning for all datasets except for SST.
-  Every dataset is lower cased except for TREC
   """
   string = re.sub(r"[^A-Za-z0-9(),!?\'\`]", " ", string)     
   string = re.sub(r"\'s", " \'s", string) 
@@ -194,7 +221,7 @@ def clean_str(string, TREC=False):
   string = re.sub(r"\)", " ) ", string) 
   string = re.sub(r"\?", " ? ", string) 
   string = re.sub(r"\s{2,}", " ", string)    
-  return string.strip().lower() if TREC else string.strip()
+  return string.strip().lower()
 
 def clean_str_sst(string):
   """
@@ -205,14 +232,14 @@ def clean_str_sst(string):
   return string.strip().lower()
 
 if __name__ == '__main__':
-  if len(sys.argv) < 2:
-    print 'Must specify dataset'
+  if len(sys.argv) < 3:
+    print 'Must specify word2vec path and dataset'
     sys.exit(0)
 
   # Dataset name
-  dataset = sys.argv[1]
+  dataset = sys.argv[2]
   if dataset == 'MR':
-    data, labels, word_to_idx = load_data("rt-polarity.pos", "rt-polarity.neg", dataset)
+    data, labels, word_to_idx = load_data("data/rt-polarity.pos", "data/rt-polarity.neg", dataset)
   elif dataset == 'Subj':
     data, labels, word_to_idx = load_data("data/subj.objective", "data/subj.subjective", dataset)
   elif dataset == 'CR':
@@ -223,12 +250,16 @@ if __name__ == '__main__':
     train, train_label, test, test_label, word_to_idx = load_trec_data()
   elif dataset == 'SST1' or dataset == 'SST2':
     train, train_label, dev, dev_label, test, test_label, word_to_idx = load_sst_data(dataset)
+  elif dataset == 'custom':
+    # Train on custom dataset
+    train_path = sys.argv[3]
+    data, labels, word_to_idx = load_custom_data(train_path)
   else:
     print 'Unrecognized dataset:', dataset
     sys.exit(0)
 
-  w2v = load_bin_vec("/n/rush_lab/data/GoogleNews-vectors-negative300.bin", word_to_idx)
-  # w2v = load_bin_vec("../CNN_sentence/GoogleNews-vectors-negative300.bin", word_to_idx)
+  # w2v = load_bin_vec("/n/rush_lab/data/GoogleNews-vectors-negative300.bin", word_to_idx)
+  w2v = load_bin_vec(sys.argv[1], word_to_idx)
   V = len(word_to_idx) + 1
   print 'Vocab size:', V
 
@@ -238,14 +269,14 @@ if __name__ == '__main__':
   for word, vec in w2v.items():
     embed[word_to_idx[word] - 1] = vec
 
-  if dataset == 'MR' or dataset == 'Subj' or dataset == 'CR' or dataset == 'MPQA':
+  if dataset == 'SST1' or dataset == 'SST2' or dataset == 'TREC':
+    print 'train size:', train.shape
+  else:
     N = data.shape[0]
     print 'data size:', data.shape
     perm = np.random.permutation(N)
     data = data[perm]
     labels = labels[perm]
-  else:
-    print 'train size:', train.shape
 
   filename = dataset + '.hdf5'
   with h5py.File(filename, "w") as f:
