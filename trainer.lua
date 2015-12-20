@@ -4,12 +4,6 @@ require 'torch'
 
 local Trainer = torch.class('Trainer')
 
-function Trainer.init_cmd(cmd)
-  cmd:option('-optim_method', 'adadelta', 'Gradient descent method. Options: adadelta, adam')
-  cmd:option('-L2s', 3, 'L2 normalize weights')
-  cmd:option('-batch_size', 50, 'Batch size for training')
-end
-
 -- Perform one epoch of training.
 function Trainer:train(train_data, train_labels, model, criterion, optim_method, layers, state, params, grads, opts)
   model:training()

@@ -4,22 +4,6 @@ require 'nngraph'
 
 local ModelBuilder = torch.class('ModelBuilder')
 
-function ModelBuilder.init_cmd(cmd)
-  cmd:option('-vocab_size', 18766, 'Vocab size')
-  cmd:option('-vec_size', 300, 'word2vec vector size')
-  cmd:option('-max_sent', 59, 'maximum sentence length')
-
-  cmd:option('-num_feat_maps', 100, 'Number of feature maps after 1st convolution')
-  cmd:option('-kernel1', 3, 'Kernel size of convolution 1')
-  cmd:option('-kernel2', 4, 'Kernel size of convolution 2')
-  cmd:option('-kernel3', 5, 'Kernel size of convolution 3')
-  cmd:option('-skip_kernel', 0, 'Use skip kernel')
-  cmd:option('-dropout_p', 0.5, 'p for dropout')
-  cmd:option('-highway_mlp', 0, 'Number of highway MLP layers')
-  cmd:option('-highway_conv_layers', 0, 'Number of highway MLP layers')
-  cmd:option('-num_classes', 2, 'Number of output classes')
-end
-
 function ModelBuilder:make_net(w2v, opts)
   if opts.cudnn == 1 then
     require 'cudnn'
