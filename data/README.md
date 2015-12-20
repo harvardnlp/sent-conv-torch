@@ -19,3 +19,13 @@ The following datasets are included in this directory:
   * **Subj**: Subjectivity dataset where the task is to classify a sentence as being subjective or objective (Pang and Lee, 2004). [Link](http://cogcomp.cs.illinois.edu/Data/QA/QC/)
   * **TREC**: TREC question dataset - task involves classifying a question into 6 question types (whether the question is about person, location, numeric information, etc.) (Li and Roth, 2002). [Link](http://www.cs.uic.edu/⇠liub/FBS/sentiment-analysis.html)
   * **CR**: Customer reviews of various products (cameras, MP3s etc.). Task is to predict positive/negative reviews (Hu and Liu, 2004). [Link](http://www.cs.pitt.edu/mpqa/)
+
+## Data files
+
+MR | rt-polarity.\*
+SST-1 | stsa.fine.\*
+SST-2 | stsa.binary.\*
+Subj | subj.\*
+TREC | TREC.\*
+CR | custrev.\*
+MPQA | mpqa.\*

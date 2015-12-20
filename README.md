@@ -1,12 +1,12 @@
 # Sentence Convolution Code in Torch
 
-This code implements Yoon's sentence convolution code in torch with GPUs.
+This code implements Yoon's sentence convolution code in torch with GPUs. It replicates his results on existing datasets, and allows training of models on arbitrary other text datasets.
 
 ## Quickstart
 
-To make data in hdf5 format, run the following (with choice of dataset):
+To make data in hdf5 format, run the following (with word2vec .bin path and choice of dataset):
 
-    python make_hdf5.py MR
+    python make_hdf5.py /path/to/word2vec.bin MR
 
 To run training with GPUs:
 
@@ -20,6 +20,8 @@ The training pipeline requires Python hdf5 (the h5py module) and the following l
   * hdf5
   * cudnn
 
+Training on word2vec architecture models requires downloading [word2vec](https://code.google.com/p/word2vec/) and unzipping.
+
 ## Creating datasets
 
 We process the following datasets: `MR, SST1, SST2, Subj, TREC, CR, MPQA`.
@@ -28,6 +30,22 @@ All raw training data is located in the `data/` directory. The `SST1, SST2` data
 The data takes word2vec embeddings (from `/n/rush_lab/data/GoogleNews-vectors-negative300.bin`), processes the vocabulary, and outputs a data matrix of vocabulary indices for each sentence.
 
 Each dataset is packaged into a `.hdf5` file and includes the word2vec embeddings.
+
+To create the hdf5 file, run the following with DATASET as one of the described datasets:
+
+    python make_hdf5.py /path/to/word2vec.bin DATASET
+
+### Training on custom datasets
+
+We allow training on arbitrary text datasets. They should be formatted in the same way as SST-1, with one sentence per line, and the first word the class label (0-indexed). Our code handles most parsing of punctuation, possessives, capitalization, etc.
+
+Example:
+
+    1 no movement , no yuks , not much of anything .
+
+Then run:
+
+    python make_hdf5.py /path/to/word2vec.bin custom /path/to/train/data
 
 ## Running torch
 
@@ -39,7 +57,7 @@ There are four main model architectures we implemented, as described in Yoon's p
   * `nonstatic` also initializes to word2vec, but allows them to be learned.
   * `multichannel` has two word2vec embedding layers, one static and one nonstatic. The two layers outputs are summed.
 
-It is highly recommended that GPUs are used during training (see Results section for timing benchmarks).
+It is highly recommended that GPUs are used during training if possible (see Results section for timing benchmarks).
 
 ### Model augmentations
 
@@ -53,7 +71,7 @@ Results from these experiments are described below in the Results section.
 
 ### Parameters
 
-The following parameters are allowed by the code.
+The following parameters are allowed by the torch code.
   * `cudnn`: Use GPUs if set to 1, otherwise set to 0
   * `num_epochs`: Number of training epochs.
   * `model_type`: Model architecture, as described above. Options: rand, static, nonstatic, multichannel
@@ -88,6 +106,8 @@ When training is complete, the code outputs the following table into a file `TIM
   * `model` with best model (as determined by cross-validation)
 
 ## Results
+
+The following results were collected with the same training setup as in Yoon's paper (same parameters, 10-fold cross validation if data has no test set, 25 epochs).
 
 ### Scores
 
