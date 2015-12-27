@@ -1,6 +1,6 @@
 # Sentence Convolution Code in Torch
 
-This code implements Yoon's sentence convolution code in torch with GPUs. It replicates his results on existing datasets, and allows training of models on arbitrary other text datasets.
+This code implements Kim (2014) sentence convolution code in torch with GPUs. It replicates his results on existing datasets, and allows training of models on arbitrary other text datasets.
 
 ## Quickstart
 
@@ -27,19 +27,21 @@ Training on word2vec architecture models requires downloading [word2vec](https:/
 We process the following datasets: `MR, SST1, SST2, Subj, TREC, CR, MPQA`.
 All raw training data is located in the `data/` directory. The `SST1, SST2` data have both test and dev sets, and TREC has a test set.
 
-The data takes word2vec embeddings (from `/n/rush_lab/data/GoogleNews-vectors-negative300.bin`), processes the vocabulary, and outputs a data matrix of vocabulary indices for each sentence.
-
-Each dataset is packaged into a `.hdf5` file and includes the word2vec embeddings.
+The data takes word2vec embeddings, processes the vocabulary, and outputs a data matrix of vocabulary indices for each sentence.
 
 To create the hdf5 file, run the following with DATASET as one of the described datasets:
 
     python make_hdf5.py /path/to/word2vec.bin DATASET
 
+The script outputs:
+  * the `DATASET.hdf5` file with the data matrix and word2vec embeddings
+  * a `DATASET.txt` file with a word-index dictionary for the word embeddings
+
 ### Training on custom datasets
 
-We allow training on arbitrary text datasets. They should be formatted in the same way as SST-1, with one sentence per line, and the first word the class label (0-indexed). Our code handles most parsing of punctuation, possessives, capitalization, etc.
+We allow training on arbitrary text datasets. They should be formatted in the same way as the sample data, with one sentence per line, and the first word the class label (0-indexed). Our code handles most parsing of punctuation, possessives, capitalization, etc.
 
-Example:
+Example line:
 
     1 no movement , no yuks , not much of anything .
 
@@ -51,7 +53,7 @@ Then run:
 
 Training is done with 10-fold cross-validation and 25 epochs. If the data set comes with a test set, we don't do cross validation (but split training data 90/10 for the dev set). If the data comes with the dev set, we don't do additional preprocessing.
 
-There are four main model architectures we implemented, as described in Yoon's paper: `rand, static, nonstatic, multichannel`.
+There are four main model architectures we implemented, as described in Kim (2014): `rand, static, nonstatic, multichannel`.
   * `rand` initializes the word embeddings randomly and learns them.
   * `static` initializes the word embeddings to word2vec and keeps the weight static.
   * `nonstatic` also initializes to word2vec, but allows them to be learned.
@@ -104,10 +106,11 @@ When training is complete, the code outputs the following table into a file `TIM
   * `test scores` with test scores,
   * `opts` with model parameters,
   * `model` with best model (as determined by cross-validation)
+  * `embeddings` if nonstatic model type, with the updated word embeddings
 
 ## Results
 
-The following results were collected with the same training setup as in Yoon's paper (same parameters, 10-fold cross validation if data has no test set, 25 epochs).
+The following results were collected with the same training setup as in Kim (2014) (same parameters, 10-fold cross validation if data has no test set, 25 epochs).
 
 ### Scores
 
@@ -138,7 +141,7 @@ From these results, we see that using GPUs achieves almost a 50x speedup on trai
 
 ## Relevant publications
 
-Most of this code is based on Yoon's paper and Theano [code](https://github.com/yoonkim/CNN_sentence/). 
+This code is based on Kim (2014) and its corresponding Theano [code](https://github.com/yoonkim/CNN_sentence/). 
 
     Kim, Y. (2014). Convolutional Neural Networks for Sentence Classification. In Proceedings of the 2014 Conference on Empirical Methods in Natural Language Processing (EMNLP), pp. 1746–1751, Doha, Qatar. Association for Computational Linguistics.
 

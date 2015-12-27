@@ -331,9 +331,7 @@ local function main()
   end
   save['opts'] = opts
   save['model'] = best_model
-  if opts.model_type == 'nonstatic' then
-    save['embeddings'] = get_layer(best_model, 'nn.LookupTable').weight
-  end
+  save['embeddings'] = get_layer(best_model, 'nn.LookupTable').weight
   torch.save(savefile, save)
 end
 

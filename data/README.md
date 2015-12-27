@@ -1,7 +1,7 @@
 # Datasets
 
 **Data** | Classes | Average sentence length | Dataset size | Vocab size | Number of words present in word2vec | Test size
---- | --- | --- | --- | ---
+--- | --- | --- | --- | --- | --- | ---
 MR | 2 | 20 | 10662 | 18765 | 16448 | CV
 SST1 | 5 | 18 | 11855 | 17836 | 16262 | 2210
 SST2 | 2 | 19 | 9613 | 16185 | 14838 | 1821
@@ -22,10 +22,11 @@ The following datasets are included in this directory:
 
 ## Data files
 
-MR | rt-polarity.\*
+--- | ---
+MR | rt-polarity.all
 SST-1 | stsa.fine.\*
 SST-2 | stsa.binary.\*
-Subj | subj.\*
+Subj | subj.all
 TREC | TREC.\*
-CR | custrev.\*
-MPQA | mpqa.\*
+CR | custrev.all
+MPQA | mpqa.all
