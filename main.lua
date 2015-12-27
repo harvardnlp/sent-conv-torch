@@ -3,6 +3,18 @@ require 'nn'
 require 'optim'
 require 'lfs'
 
+local function get_layer(model, name)
+  local named_layer
+  function get(layer)
+    if torch.typename(layer) == name or layer.name == name then
+      named_layer = layer
+    end
+  end
+
+  model:apply(get)
+  return named_layer
+end
+
 -- build model for training
 local function build_model(w2v, opts)
   local ModelBuilder = require 'model.convNN'
@@ -25,24 +37,24 @@ local function build_model(w2v, opts)
 
   -- get layers
   local layers = {}
-  layers['linear'] = model_builder:get_layer(model, 'nn.Linear')
-  layers['w2v'] = model_builder:get_layer(model, 'nn.LookupTable')
+  layers['linear'] = get_layer(model, 'nn.Linear')
+  layers['w2v'] = get_layer(model, 'nn.LookupTable')
   if opts.skip_kernel > 0 then
-    layers['skip_conv'] = model_builder:get_layer(model, 'skip_conv')
+    layers['skip_conv'] = get_layer(model, 'skip_conv')
   end
   if opts.model_type == 'multichannel' then
-    layers['chan1'] = model_builder:get_layer(model, 'channel1')
+    layers['chan1'] = get_layer(model, 'channel1')
   end
 
   return model, criterion, layers
 end
 
 local function train_loop(data, data_label, train, train_label, dev, dev_label, test, test_label, w2v, opts)
--- Initialize objects
-local Trainer = require 'trainer'
-local trainer = Trainer.new()
+  -- Initialize objects
+  local Trainer = require 'trainer'
+  local trainer = Trainer.new()
 
-local optim_method
+  local optim_method
   if opts.optim_method == 'adadelta' then
     optim_method = optim.adadelta
   elseif opts.optim_method == 'adam' then
@@ -319,6 +331,9 @@ local function main()
   end
   save['opts'] = opts
   save['model'] = best_model
+  if opts.model_type == 'nonstatic' then
+    save['embeddings'] = get_layer(best_model, 'nn.LookupTable').weight
+  end
   torch.save(savefile, save)
 end
 

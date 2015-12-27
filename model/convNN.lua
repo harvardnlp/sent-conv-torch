@@ -137,16 +137,4 @@ function ModelBuilder:make_net(w2v, opts)
   return model
 end
 
-function ModelBuilder:get_layer(model, name)
-  local named_layer
-  function get_layer(layer)
-    if torch.typename(layer) == name or layer.name == name then
-      named_layer = layer
-    end
-  end
-
-  model:apply(get_layer)
-  return named_layer
-end
-
 return ModelBuilder
