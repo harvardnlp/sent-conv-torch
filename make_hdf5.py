@@ -2,7 +2,7 @@ import numpy as np
 import h5py
 import re
 import sys
-import argparse
+import operator
 
 def load_bin_vec(fname, vocab):
     """
@@ -34,13 +34,7 @@ def line_to_words(line, dataset):
   else:
     clean_line = clean_str(line.strip())
   words = clean_line.split(' ')
-
-  print words
-
-  if dataset == 'SST1' or dataset == 'SST2' or dataset == 'custom':
-    words = words[1:]
-  elif dataset == 'TREC':
-    words = words[2:]
+  words = words[1:]
 
   return words
 
@@ -63,79 +57,15 @@ def get_vocab(file_list, dataset=''):
 
   return max_sent_len, word_to_idx
 
-def load_data(pos_fname, neg_fname, dataset):
-  max_sent_len, word_to_idx = get_vocab([pos_fname, neg_fname])
-
-  pos_file = open(pos_fname, "r")
-  neg_file = open(neg_fname, "r")
-
-  pos_data = []
-  neg_data = []
-
-  extra_padding = 4
-  for data, file in zip([pos_data, neg_data], [pos_file, neg_file]):
-    for line in file:
-        words = line_to_words(line, dataset)
-        sent = [word_to_idx[word] for word in words]
-        # end padding
-        if len(sent) < max_sent_len + extra_padding:
-            sent.extend([1] * (max_sent_len + extra_padding - len(sent)))
-        # start padding
-        sent = [1]*extra_padding + sent
-
-        data.append(sent)
-
-  labels = [1] * len(pos_data) + [2] * len(neg_data)
-
-  pos_file.close()
-  neg_file.close()
-
-  return np.array(pos_data + neg_data, dtype=np.int32), np.array(labels, np.int32), word_to_idx
-
-def load_custom_data(train_fname, test_fname=""):
-  max_sent_len, word_to_idx = get_vocab([train_fname])
-
-  f = open(train_fname, "r")
-
-  data = []
-  label = []
-
-  extra_padding = 4
-  for line in f:
-      words = line_to_words(line, "custom")
-      y = int(line[0]) + 1
-      sent = [word_to_idx[word] for word in words]
-      # end padding
-      if len(sent) < max_sent_len + extra_padding:
-          sent.extend([1] * (max_sent_len + extra_padding - len(sent)))
-      # start padding
-      sent = [1]*extra_padding + sent
-
-      data.append(sent)
-      label.append(y)
-
-  f.close()
-  return np.array(data, dtype=np.int32), np.array(label, dtype=np.int32), word_to_idx
-
-def load_sst_data(dataset):
+def load_data(dataset, train_name, test_name='', dev_name=''):
   """
-  Load SST data. If SST1, we use 5 sentiment classes. If
-  SST2, we discard neutral and use binary classes.
+  Load training data (dev/test optional).
   """
-  f_prefix = 'data/'
-  if dataset == 'SST1':
-    f_prefix = f_prefix + 'stsa.fine'
-  elif dataset == 'SST2':
-    f_prefix = f_prefix + 'stsa.binary'
+  f_names = [train_name]
+  if not test_name == '': f_names.append(test_name)
+  if not dev_name == '': f_names.append(dev_name)
 
-  dev_name = f_prefix + '.dev'
-  train_name = f_prefix + '.phrases.train'
-  test_name = f_prefix + '.test'
-  max_sent_len, word_to_idx = get_vocab([dev_name, train_name, test_name], dataset)
-
-  f_dev = open(dev_name, 'r')
-  f_train = open(train_name, 'r')
-  f_test = open(test_name, 'r')
+  max_sent_len, word_to_idx = get_vocab(f_names, dataset)
 
   dev = []
   dev_label = []
@@ -144,65 +74,47 @@ def load_sst_data(dataset):
   test = []
   test_label = []
 
-  extra_padding = 4
-  for data, label, f in zip([dev, train, test], [dev_label, train_label, test_label], [f_dev, f_train, f_test]):
-    for line in f:
-        words = line_to_words(line, dataset)
-        y = int(line[0]) + 1
-        sent = [word_to_idx[word] for word in words]
-        # end padding
-        if len(sent) < max_sent_len + extra_padding:
-            sent.extend([1] * (max_sent_len + extra_padding - len(sent)))
-        # start padding
-        sent = [1]*extra_padding + sent
-
-        data.append(sent)
-        label.append(y)
-
-  f_dev.close()
-  f_train.close()
-  f_test.close()
-
-  return np.array(train, dtype=np.int32), np.array(train_label, dtype=np.int32), np.array(dev, dtype=np.int32), np.array(dev_label, dtype=np.int32), np.array(test, dtype=np.int32), np.array(test_label, dtype=np.int32), word_to_idx
-
-def load_trec_data(dataset='TREC'):
-  """
-  Load TREC data
-  """
-  f_prefix = 'data/TREC'
-
-  train_name = f_prefix + '.train'
-  test_name = f_prefix + '.test'
-  max_sent_len, word_to_idx = get_vocab([train_name, test_name], dataset)
+  files = []
+  data = []
+  data_label = []
 
   f_train = open(train_name, 'r')
-  f_test = open(test_name, 'r')
-
-  train = []
-  train_label = []
-  test = []
-  test_label = []
+  files.append(f_train)
+  data.append(train)
+  data_label.append(train_label)
+  if not test_name == '':
+    f_test = open(test_name, 'r')
+    files.append(f_test)
+    data.append(test)
+    data_label.append(test_label)
+  if not dev_name == '':
+    f_dev = open(dev_name, 'r')
+    files.append(f_dev)
+    data.append(dev)
+    data_label.append(dev_label)
 
   extra_padding = 4
-  c = {'DESC': 1, 'ENTY': 2, 'ABBR': 3, 'HUM': 4, 'LOC': 5, 'NUM': 6}
-  for data, label, f in zip([train, test], [train_label, test_label], [f_train, f_test]):
+  for d, lbl, f in zip(data, data_label, files):
     for line in f:
-        words = line_to_words(line, dataset)
-        y = c[line.split(':')[0]]
-        sent = [word_to_idx[word] for word in words]
-        # start padding
-        if len(sent) < max_sent_len + extra_padding:
-            sent.extend([1] * (max_sent_len + extra_padding - len(sent)))
-        # end padding
-        sent = [1]*extra_padding + sent
+      words = line_to_words(line, dataset)
+      y = int(line[0]) + 1
+      sent = [word_to_idx[word] for word in words]
+      # end padding
+      if len(sent) < max_sent_len + extra_padding:
+          sent.extend([1] * (max_sent_len + extra_padding - len(sent)))
+      # start padding
+      sent = [1]*extra_padding + sent
 
-        data.append(sent)
-        label.append(y)
+      d.append(sent)
+      lbl.append(y)
 
   f_train.close()
-  f_test.close()
+  if not test_name == '':
+    f_test.close()
+  if not dev_name == '':
+    f_dev.close()
 
-  return np.array(train, dtype=np.int32), np.array(train_label, dtype=np.int32), np.array(test, dtype=np.int32), np.array(test_label, dtype=np.int32), word_to_idx
+  return word_to_idx, np.array(train, dtype=np.int32), np.array(train_label, dtype=np.int32), np.array(test, dtype=np.int32), np.array(test_label, dtype=np.int32), np.array(dev, dtype=np.int32), np.array(dev_label, dtype=np.int32)
 
 def clean_str(string):
   """
@@ -239,26 +151,35 @@ if __name__ == '__main__':
   # Dataset name
   dataset = sys.argv[2]
   if dataset == 'MR':
-    data, labels, word_to_idx = load_data("data/rt-polarity.pos", "data/rt-polarity.neg", dataset)
+    word_to_idx, data, labels, _,_,_,_ = load_data(dataset, "data/rt-polarity.all")
   elif dataset == 'Subj':
-    data, labels, word_to_idx = load_data("data/subj.objective", "data/subj.subjective", dataset)
+    word_to_idx, data, labels, _,_,_,_ = load_data(dataset, "data/subj.all")
   elif dataset == 'CR':
-    data, labels, word_to_idx = load_data("data/custrev.pos", "data/custrev.neg", dataset)
+    word_to_idx, data, labels, _,_,_,_ = load_data(dataset, "data/custrev.all")
   elif dataset == 'MPQA':
-    data, labels, word_to_idx = load_data("data/mpqa.pos", "data/mpqa.neg", dataset)
+    word_to_idx, data, labels, _,_,_,_ = load_data(dataset, "data/mpqa.all")
   elif dataset == 'TREC':
-    train, train_label, test, test_label, word_to_idx = load_trec_data()
-  elif dataset == 'SST1' or dataset == 'SST2':
-    train, train_label, dev, dev_label, test, test_label, word_to_idx = load_sst_data(dataset)
+    word_to_idx, train, train_label, test, test_label, _,_ = load_data(dataset, "data/TREC.train.all", test="data/TREC.test.all")
+  elif dataset == 'SST1':
+    word_to_idx, train, train_label, test, test_label, dev, dev_label = load_data(dataset, "data/stsa.fine.phrases.train", test="data/stsa.fine.test", dev="data/stsa.fine.dev")
+  elif dataset == 'SST2':
+    word_to_idx, train, train_label, test, test_label, dev, dev_label = load_data(dataset, "data/stsa.binary.phrases.train", test="data/stsa.binary.test", dev="data/stsa.binary.dev")
   elif dataset == 'custom':
     # Train on custom dataset
+    # TODO(jeffreyling): add dev/test support
     train_path = sys.argv[3]
-    data, labels, word_to_idx = load_custom_data(train_path)
+    data, labels, word_to_idx = load_data(dataset, train_path)
   else:
     print 'Unrecognized dataset:', dataset
     sys.exit(0)
 
-  # w2v = load_bin_vec("/n/rush_lab/data/GoogleNews-vectors-negative300.bin", word_to_idx)
+  # Write word mapping to text file.
+  embeddings_f = open(dataset + '_word_mapping.txt', 'w+')
+  for word, idx in sorted(word_to_idx.items(), key=operator.itemgetter(1)):
+    embeddings_f.write("%s %d\n" % (word, idx))
+  embeddings_f.close()
+
+  # Load word2vec
   w2v = load_bin_vec(sys.argv[1], word_to_idx)
   V = len(word_to_idx) + 1
   print 'Vocab size:', V
