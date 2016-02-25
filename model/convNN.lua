@@ -4,8 +4,8 @@ require 'nngraph'
 
 local ModelBuilder = torch.class('ModelBuilder')
 
-function ModelBuilder:make_net(w2v, opts)
-  if opts.cudnn == 1 then
+function ModelBuilder:make_net(w2v)
+  if opt.cudnn == 1 then
     require 'cudnn'
     require 'cunn'
   end
@@ -13,10 +13,10 @@ function ModelBuilder:make_net(w2v, opts)
   local input = nn.Identity()()
 
   local lookup
-  if opts.model_type == 'multichannel' then
+  if opt.model_type == 'multichannel' then
     local channels = {}
     for i = 1, 2 do
-      local chan = nn.LookupTable(opts.vocab_size, opts.vec_size)
+      local chan = nn.LookupTable(opt.vocab_size, opt.vec_size)
       chan.weight:copy(w2v)
       chan.weight[1]:zero()
       chan.name = 'channel' .. i
@@ -24,8 +24,8 @@ function ModelBuilder:make_net(w2v, opts)
     end
     lookup = channels
   else
-    lookup = nn.LookupTable(opts.vocab_size, opts.vec_size)
-    if opts.model_type == 'static' or opts.model_type == 'nonstatic' then
+    lookup = nn.LookupTable(opt.vocab_size, opt.vec_size)
+    if opt.model_type == 'static' or opt.model_type == 'nonstatic' then
       lookup.weight:copy(w2v)
     else
       -- rand
@@ -38,43 +38,44 @@ function ModelBuilder:make_net(w2v, opts)
   end
 
   -- kernels is an array of kernel sizes
-  local kernels = {opts.kernel1, opts.kernel2, opts.kernel3}
+  loadstring("opt.kernels = " .. opt.kernels)()
+  local kernels = opt.kernels
   local layer1 = {}
   for i = 1, #kernels do
     local conv
     local conv_layer
     local max_time
-    if opts.cudnn == 1 then
-      conv = cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, kernels[i])
-      if opts.model_type == 'multichannel' then
+    if opt.cudnn == 1 then
+      conv = cudnn.SpatialConvolution(1, opt.num_feat_maps, opt.vec_size, kernels[i])
+      if opt.model_type == 'multichannel' then
         local lookup_conv = {}
         for chan = 1, 2 do
-          table.insert(lookup_conv, nn.Reshape(opts.num_feat_maps, opts.max_sent-kernels[i]+1, true)(
+          table.insert(lookup_conv, nn.Reshape(opt.num_feat_maps, opt.max_sent-kernels[i]+1, true)(
             conv(
-            nn.Reshape(1, opts.max_sent, opts.vec_size, true)(
+            nn.Reshape(1, opt.max_sent, opt.vec_size, true)(
             lookup[chan]))))
         end
         conv_layer = nn.CAddTable()(lookup_conv)
         max_time = nn.Max(3)(cudnn.ReLU()(conv_layer))
       else
-        if opts.highway_conv_layers > 0 then
+        if opt.highway_conv_layers > 0 then
           -- Highway conv layers
-          local highway_conv = HighwayConv.conv(opts.vec_size, opts.max_sent, kernels[i], opts.highway_conv_layers)
-          conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kernels[i]+1, true)(
-            conv(nn.Reshape(1, opts.max_sent, opts.vec_size, true)(
+          local highway_conv = HighwayConv.conv(opt.vec_size, opt.max_sent, kernels[i], opt.highway_conv_layers)
+          conv_layer = nn.Reshape(opt.num_feat_maps, opt.max_sent-kernels[i]+1, true)(
+            conv(nn.Reshape(1, opt.max_sent, opt.vec_size, true)(
             highway_conv(lookup))))
           max_time = nn.Max(3)(cudnn.ReLU()(conv_layer))
         else
-          conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kernels[i]+1, true)(
+          conv_layer = nn.Reshape(opt.num_feat_maps, opt.max_sent-kernels[i]+1, true)(
             conv(
-            nn.Reshape(1, opts.max_sent, opts.vec_size, true)(
+            nn.Reshape(1, opt.max_sent, opt.vec_size, true)(
             lookup)))
           max_time = nn.Max(3)(cudnn.ReLU()(conv_layer))
         end
       end
     else
-      conv = nn.TemporalConvolution(opts.vec_size, opts.num_feat_maps, kernels[i])
-      if opts.model_type == 'multichannel' then
+      conv = nn.TemporalConvolution(opt.vec_size, opt.num_feat_maps, kernels[i])
+      if opt.model_type == 'multichannel' then
         local lookup_conv = {}
         for chan = 1,2 do
           table.insert(lookup_conv, conv(lookup[chan]))
@@ -82,7 +83,7 @@ function ModelBuilder:make_net(w2v, opts)
         conv_layer = nn.CAddTable()(lookup_conv)
         max_time = nn.Max(2)(nn.ReLU()(conv_layer)) -- max over time
       else
-        conv = nn.TemporalConvolution(opts.vec_size, opts.num_feat_maps, kernels[i])
+        conv = nn.TemporalConvolution(opt.vec_size, opt.num_feat_maps, kernels[i])
         conv_layer = conv(lookup)
         max_time = nn.Max(2)(nn.ReLU()(conv_layer)) -- max over time
       end
@@ -93,16 +94,16 @@ function ModelBuilder:make_net(w2v, opts)
     table.insert(layer1, max_time)
   end
 
-  if opts.skip_kernel > 0 then
+  if opt.skip_kernel > 0 then
     -- skip kernel
     local kern_size = 5 -- fix for now
-    local skip_conv = cudnn.SpatialConvolution(1, opts.num_feat_maps, opts.vec_size, kern_size)
+    local skip_conv = cudnn.SpatialConvolution(1, opt.num_feat_maps, opt.vec_size, kern_size)
     skip_conv.name = 'skip_conv'
     skip_conv.weight:uniform(-0.01, 0.01)
     -- skip center for now
     skip_conv.weight:select(3,3):zero()
     skip_conv.bias:zero()
-    local skip_conv_layer = nn.Reshape(opts.num_feat_maps, opts.max_sent-kern_size+1, true)(skip_conv(nn.Reshape(1, opts.max_sent, opts.vec_size, true)(lookup)))
+    local skip_conv_layer = nn.Reshape(opt.num_feat_maps, opt.max_sent-kern_size+1, true)(skip_conv(nn.Reshape(1, opt.max_sent, opt.vec_size, true)(lookup)))
     table.insert(layer1, nn.Max(3)(cudnn.ReLU()(skip_conv_layer)))
   end
 
@@ -114,25 +115,25 @@ function ModelBuilder:make_net(w2v, opts)
   end
 
   local last_layer = conv_layer_concat
-  if opts.highway_mlp > 0 then
+  if opt.highway_mlp > 0 then
     -- use highway layers
-    local highway = HighwayMLP.mlp((#layer1) * opts.num_feat_maps, opts.highway_layers)
+    local highway = HighwayMLP.mlp((#layer1) * opt.num_feat_maps, opt.highway_layers)
     last_layer = highway(conv_layer_concat)
   end
 
   -- simple MLP layer
-  local linear = nn.Linear((#layer1) * opts.num_feat_maps, opts.num_classes)
+  local linear = nn.Linear((#layer1) * opt.num_feat_maps, opt.num_classes)
   linear.weight:normal():mul(0.01)
   linear.bias:zero()
 
   local softmax
-  if opts.cudnn == 1 then
+  if opt.cudnn == 1 then
     softmax = cudnn.LogSoftMax()
   else
     softmax = nn.LogSoftMax()
   end
 
-  local output = softmax(linear(nn.Dropout(opts.dropout_p)(last_layer))) 
+  local output = softmax(linear(nn.Dropout(opt.dropout_p)(last_layer))) 
   model = nn.gModule({input}, {output})
   return model
 end

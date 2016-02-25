@@ -5,7 +5,7 @@ require 'torch'
 local Trainer = torch.class('Trainer')
 
 -- Perform one epoch of training.
-function Trainer:train(train_data, train_labels, model, criterion, optim_method, layers, state, params, grads, opts)
+function Trainer:train(train_data, train_labels, model, criterion, optim_method, layers, state, params, grads)
   model:training()
 
   local train_size = train_data:size(1)
@@ -15,30 +15,30 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
   local total_err = 0
 
   local classes = {}
-  for i = 1, opts.num_classes do
+  for i = 1, opt.num_classes do
     table.insert(classes, i)
   end
   local confusion = optim.ConfusionMatrix(classes)
   confusion:zero()
 
   local config -- for optim
-  if opts.optim_method == 'adadelta' then
+  if opt.optim_method == 'adadelta' then
     config = { rho = 0.95, eps = 1e-6 } 
-  elseif opts.optim_method == 'adam' then
+  elseif opt.optim_method == 'adam' then
     config = {}
   end
 
   -- shuffle batches
-  local num_batches = math.floor(train_size / opts.batch_size)
+  local num_batches = math.floor(train_size / opt.batch_size)
   local shuffle = torch.randperm(num_batches)
   for i = 1, shuffle:size(1) do
-    local t = (shuffle[i] - 1) * opts.batch_size + 1
-    local batch_size = math.min(opts.batch_size, train_size - t + 1)
+    local t = (shuffle[i] - 1) * opt.batch_size + 1
+    local batch_size = math.min(opt.batch_size, train_size - t + 1)
 
     -- data samples and labels, in mini batches.
     local inputs = train_data:narrow(1, t, batch_size)
     local targets = train_labels:narrow(1, t, batch_size)
-    if opts.cudnn == 1 then
+    if opt.cudnn == 1 then
       inputs = inputs:cuda()
       targets = targets:cuda()
     else
@@ -69,10 +69,10 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
       local df_do = criterion:backward(outputs, targets)
       model:backward(inputs, df_do)
 
-      if opts.model_type == 'static' then
+      if opt.model_type == 'static' then
         -- don't update embeddings for static model
         layers.w2v.gradWeight:zero()
-      elseif opts.model_type == 'multichannel' then
+      elseif opt.model_type == 'multichannel' then
         -- keep one embedding channel static
         layers.chan1.gradWeight:zero()
       end
@@ -84,7 +84,7 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
     optim_method(func, params, config, state)
     -- reset padding embedding to zero
     layers.w2v.weight[1]:zero()
-    if opts.skip_kernel > 0 then
+    if opt.skip_kernel > 0 then
       -- keep skip kernel at zero
       layers.skip_conv.weight:select(3,3):zero()
     end
@@ -92,7 +92,7 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
     -- Renorm (Euclidean projection to L2 ball)
     local renorm = function(row)
       local n = row:norm()
-      row:mul(opts.L2s):div(1e-7 + n)
+      row:mul(opt.L2s):div(1e-7 + n)
     end
 
     -- renormalize linear row weights
@@ -102,15 +102,15 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
     end
   end
 
-  if opts.debug == 1 then
+  if opt.debug == 1 then
     print('Total err: ' .. total_err / train_size)
     print(confusion)
   end
 
   -- time taken
   time = timer:time().real - time
-  time = opts.batch_size * time / train_size
-  if opts.debug == 1 then
+  time = opt.batch_size * time / train_size
+  if opt.debug == 1 then
     print("==> time to learn 1 batch = " .. (time*1000) .. 'ms')
   end
 
@@ -119,11 +119,11 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
   return confusion.totalValid
 end
 
-function Trainer:test(test_data, test_labels, model, criterion, opts)
+function Trainer:test(test_data, test_labels, model, criterion)
   model:evaluate()
 
   local classes = {}
-  for i = 1, opts.num_classes do
+  for i = 1, opt.num_classes do
     table.insert(classes, i)
   end
   local confusion = optim.ConfusionMatrix(classes)
@@ -133,12 +133,12 @@ function Trainer:test(test_data, test_labels, model, criterion, opts)
 
   local total_err = 0
 
-  for t = 1, test_size, opts.batch_size do
+  for t = 1, test_size, opt.batch_size do
     -- data samples and labels, in mini batches.
-    local batch_size = math.min(opts.batch_size, test_size - t + 1)
+    local batch_size = math.min(opt.batch_size, test_size - t + 1)
     local inputs = test_data:narrow(1, t, batch_size)
     local targets = test_labels:narrow(1, t, batch_size)
-    if opts.cudnn == 1 then
+    if opt.cudnn == 1 then
       inputs = inputs:cuda()
       targets = targets:cuda()
     else
@@ -155,7 +155,7 @@ function Trainer:test(test_data, test_labels, model, criterion, opts)
     end
   end
 
-  if opts.debug == 1 then
+  if opt.debug == 1 then
     print(confusion)
     print('Total err: ' .. total_err / test_size)
   end

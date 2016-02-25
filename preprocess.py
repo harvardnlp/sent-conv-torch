@@ -3,6 +3,7 @@ import h5py
 import re
 import sys
 import operator
+import argparse
 
 def load_bin_vec(fname, vocab):
     """
@@ -41,6 +42,7 @@ def line_to_words(line, dataset):
 def get_vocab(file_list, dataset=''):
   max_sent_len = 0
   word_to_idx = {}
+  # Starts at 2 for padding
   idx = 2
 
   for filename in file_list:
@@ -57,7 +59,7 @@ def get_vocab(file_list, dataset=''):
 
   return max_sent_len, word_to_idx
 
-def load_data(dataset, train_name, test_name='', dev_name=''):
+def load_data(dataset, train_name, test_name='', dev_name='', padding=4):
   """
   Load training data (dev/test optional).
   """
@@ -93,17 +95,16 @@ def load_data(dataset, train_name, test_name='', dev_name=''):
     data.append(dev)
     data_label.append(dev_label)
 
-  extra_padding = 4
   for d, lbl, f in zip(data, data_label, files):
     for line in f:
       words = line_to_words(line, dataset)
       y = int(line[0]) + 1
       sent = [word_to_idx[word] for word in words]
       # end padding
-      if len(sent) < max_sent_len + extra_padding:
-          sent.extend([1] * (max_sent_len + extra_padding - len(sent)))
+      if len(sent) < max_sent_len + padding:
+          sent.extend([1] * (max_sent_len + padding - len(sent)))
       # start padding
-      sent = [1]*extra_padding + sent
+      sent = [1]*padding + sent
 
       d.append(sent)
       lbl.append(y)
@@ -143,77 +144,78 @@ def clean_str_sst(string):
   string = re.sub(r"\s{2,}", " ", string)    
   return string.strip().lower()
 
-if __name__ == '__main__':
-  if len(sys.argv) < 3:
-    print 'Must specify word2vec path and dataset'
-    sys.exit(0)
+FILE_PATHS = {"SST1": ("data/stsa.fine.phrases.train",
+                  "data/stsa.fine.dev",
+                  "data/stsa.fine.test"),
+              "SST2": ("data/stsa.binary.phrases.train",
+                  "data/stsa.binary.dev",
+                  "data/stsa.binary.test"),
+              "MR": ("data/rt-polarity.all", "", ""),
+              "SUBJ": ("data/subj.all", "", ""),
+              "CR": ("data/custrev.all", "", ""),
+              "MPQA": ("data/mpqa.all", "", ""),
+              "TREC": ("data/TREC.train.all", "", "data/TREC.test.all"),
+              }
+args = {}
+
+def main():
+  global args
+  parser = argparse.ArgumentParser(
+      description =__doc__,
+      formatter_class=argparse.RawDescriptionHelpFormatter)
+  parser.add_argument('dataset', help="Data set", type=str)
+  parser.add_argument('w2v', help="word2vec file", type=str)
+  parser.add_argument('--train', help="custom train data", type=str, default="")
+  parser.add_argument('--test', help="custom test data", type=str, default="")
+  parser.add_argument('--dev', help="custom dev data", type=str, default="")
+  parser.add_argument('--padding', help="padding around each sentence", type=int, default=4)
+  args = parser.parse_args()
+  dataset = args.dataset
 
   # Dataset name
-  dataset = sys.argv[2]
-  if dataset == 'MR':
-    word_to_idx, data, labels, _,_,_,_ = load_data(dataset, "data/rt-polarity.all")
-  elif dataset == 'Subj':
-    word_to_idx, data, labels, _,_,_,_ = load_data(dataset, "data/subj.all")
-  elif dataset == 'CR':
-    word_to_idx, data, labels, _,_,_,_ = load_data(dataset, "data/custrev.all")
-  elif dataset == 'MPQA':
-    word_to_idx, data, labels, _,_,_,_ = load_data(dataset, "data/mpqa.all")
-  elif dataset == 'TREC':
-    word_to_idx, train, train_label, test, test_label, _,_ = load_data(dataset, "data/TREC.train.all", test="data/TREC.test.all")
-  elif dataset == 'SST1':
-    word_to_idx, train, train_label, test, test_label, dev, dev_label = load_data(dataset, "data/stsa.fine.phrases.train", test="data/stsa.fine.test", dev="data/stsa.fine.dev")
-  elif dataset == 'SST2':
-    word_to_idx, train, train_label, test, test_label, dev, dev_label = load_data(dataset, "data/stsa.binary.phrases.train", test="data/stsa.binary.test", dev="data/stsa.binary.dev")
-  elif dataset == 'custom':
+  if dataset == 'custom':
     # Train on custom dataset
-    # TODO(jeffreyling): add dev/test support
-    train_path = sys.argv[3]
-    data, labels, word_to_idx = load_data(dataset, train_path)
+    train_path, dev_path, test_path = args.train, args.dev, args.test
   else:
-    print 'Unrecognized dataset:', dataset
-    sys.exit(0)
+    train_path, dev_path, test_path = FILE_PATHS[dataset]
+
+  # Load data
+  word_to_idx, train, train_label, test, test_label, dev, dev_label = load_data(dataset, train_path, test_name=test_path, dev_name=dev_path, padding=args.padding)
 
   # Write word mapping to text file.
-  embeddings_f = open(dataset + '_word_mapping.txt', 'w+')
-  for word, idx in sorted(word_to_idx.items(), key=operator.itemgetter(1)):
-    embeddings_f.write("%s %d\n" % (word, idx))
-  embeddings_f.close()
+  with open(dataset + '_word_mapping.txt', 'w+') as embeddings_f:
+    embeddings_f.write("*PADDING* 1\n")
+    for word, idx in sorted(word_to_idx.items(), key=operator.itemgetter(1)):
+      embeddings_f.write("%s %d\n" % (word, idx))
 
   # Load word2vec
-  w2v = load_bin_vec(sys.argv[1], word_to_idx)
+  w2v = load_bin_vec(args.w2v, word_to_idx)
   V = len(word_to_idx) + 1
   print 'Vocab size:', V
 
   # Not all words in word_to_idx are in w2v.
   # Word embeddings initialized to random Unif(-0.25, 0.25)
   embed = np.random.uniform(-0.25, 0.25, (V, len(w2v.values()[0])))
+  embed[0] = 0
   for word, vec in w2v.items():
     embed[word_to_idx[word] - 1] = vec
 
-  if dataset == 'SST1' or dataset == 'SST2' or dataset == 'TREC':
-    print 'train size:', train.shape
-  else:
-    N = data.shape[0]
-    print 'data size:', data.shape
-    perm = np.random.permutation(N)
-    data = data[perm]
-    labels = labels[perm]
+  # Shuffle train
+  print 'train size:', train.shape
+  N = train.shape[0]
+  perm = np.random.permutation(N)
+  train = train[perm]
+  train_label = train_label[perm]
 
   filename = dataset + '.hdf5'
   with h5py.File(filename, "w") as f:
     f["w2v"] = np.array(embed)
-    if dataset == 'TREC':
-      f['train'] = train
-      f['train_label'] = train_label
-      f['test'] = test
-      f['test_label'] = test_label
-    elif dataset == 'SST1' or dataset == 'SST2':
-      f['train'] = train
-      f['train_label'] = train_label
-      f['test'] = test
-      f['test_label'] = test_label
-      f['dev'] = dev
-      f['dev_label'] = dev_label
-    else:
-      f["data"] = data
-      f["data_label"] = labels
+    f['train'] = train
+    f['train_label'] = train_label
+    f['test'] = test
+    f['test_label'] = test_label
+    f['dev'] = dev
+    f['dev_label'] = dev_label
+
+if __name__ == '__main__':
+  main()

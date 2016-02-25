@@ -1,4 +1,3 @@
--- From Yoon's char lstm code
 local HighwayConv = {}
 
 function HighwayConv.conv(vec_size, max_sent, kernel_size, num_layers, bias, f)
