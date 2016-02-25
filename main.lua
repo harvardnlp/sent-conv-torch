@@ -279,6 +279,9 @@ function main()
   print('vocab size: ', opt.vocab_size)
   print('vec size: ', opt.vec_size)
 
+  -- Retrieve kernels
+  loadstring("opt.kernels = " .. opt.kernels)()
+
   if opt.zero_indexing == 1 then
     train:add(1)
     train_label:add(1)

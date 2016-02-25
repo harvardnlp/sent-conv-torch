@@ -38,7 +38,6 @@ function ModelBuilder:make_net(w2v)
   end
 
   -- kernels is an array of kernel sizes
-  loadstring("opt.kernels = " .. opt.kernels)()
   local kernels = opt.kernels
   local layer1 = {}
   for i = 1, #kernels do

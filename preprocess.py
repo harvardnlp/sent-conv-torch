@@ -169,8 +169,11 @@ def main():
   parser.add_argument('--test', help="custom test data", type=str, default="")
   parser.add_argument('--dev', help="custom dev data", type=str, default="")
   parser.add_argument('--padding', help="padding around each sentence", type=int, default=4)
+  parser.add_argument('--custom_name', help="name of custom output hdf5 file", type=str, default="custom")
   args = parser.parse_args()
   dataset = args.dataset
+  if dataset == 'custom':
+    dataset = args.custom_name
 
   # Dataset name
   if dataset == 'custom':
