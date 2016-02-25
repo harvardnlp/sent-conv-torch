@@ -22,10 +22,11 @@ The following datasets are included in this directory:
 
 ## Data files
 
+Dataset | Files
 --- | ---
 MR | rt-polarity.all
-SST-1 | stsa.fine.\*
-SST-2 | stsa.binary.\*
+SST-1 | stsa.fine.\* (use phrases for train)
+SST-2 | stsa.binary.\* (use phrases for train)
 Subj | subj.all
 TREC | TREC.\*
 CR | custrev.all

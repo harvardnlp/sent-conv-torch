@@ -1,12 +1,12 @@
 # Sentence Convolution Code in Torch
 
-This code implements Kim (2014) sentence convolution code in torch with GPUs. It replicates his results on existing datasets, and allows training of models on arbitrary other text datasets.
+This code implements Kim (2014) sentence convolution code in Torch with GPUs. It replicates the results on existing datasets, and allows training of models on arbitrary other text datasets.
 
 ## Quickstart
 
 To make data in hdf5 format, run the following (with word2vec .bin path and choice of dataset):
 
-    python make_hdf5.py /path/to/word2vec.bin MR
+    python preprocess.py MR /path/to/word2vec.bin
 
 To run training with GPUs:
 
@@ -20,18 +20,20 @@ The training pipeline requires Python hdf5 (the h5py module) and the following l
   * hdf5
   * cudnn
 
-Training on word2vec architecture models requires downloading [word2vec](https://code.google.com/p/word2vec/) and unzipping.
+Training on word2vec architecture models requires downloading [word2vec](https://code.google.com/p/word2vec/) and unzipping. Simply run the script
+
+    ./get_word2vec.sh
 
 ## Creating datasets
 
-We process the following datasets: `MR, SST1, SST2, Subj, TREC, CR, MPQA`.
+We provide the following datasets: `MR, SST1, SST2, SUBJ, TREC, CR, MPQA`.
 All raw training data is located in the `data/` directory. The `SST1, SST2` data have both test and dev sets, and TREC has a test set.
 
 The data takes word2vec embeddings, processes the vocabulary, and outputs a data matrix of vocabulary indices for each sentence.
 
 To create the hdf5 file, run the following with DATASET as one of the described datasets:
 
-    python make_hdf5.py /path/to/word2vec.bin DATASET
+    python preprocess.py DATASET /path/to/word2vec.bin
 
 The script outputs:
   * the `DATASET.hdf5` file with the data matrix and word2vec embeddings
@@ -47,11 +49,13 @@ Example line:
 
 Then run:
 
-    python make_hdf5.py /path/to/word2vec.bin custom /path/to/train/data
+    python preprocess.py custom /path/to/word2vec.bin --train /path/to/train/data --test /path/to/test/data --dev /path/to/dev/data
+
+The output file's name can be set with the flag `--custom_name` (default is named custom).
 
 ## Running torch
 
-Training is done with 10-fold cross-validation and 25 epochs. If the data set comes with a test set, we don't do cross validation (but split training data 90/10 for the dev set). If the data comes with the dev set, we don't do additional preprocessing.
+Training is typically done with 10-fold cross-validation and 25 epochs. If the data set comes with a test set, we don't do cross validation (but split training data 90/10 for the dev set). If the data comes with the dev set, we don't do the split for train/dev.
 
 There are four main model architectures we implemented, as described in Kim (2014): `rand, static, nonstatic, multichannel`.
   * `rand` initializes the word embeddings randomly and learns them.
@@ -71,42 +75,42 @@ A few modifications were made to the model architecture as experiments.
 
 Results from these experiments are described below in the Results section.
 
+### Output
+
+When training is complete, the code outputs a file with name -savefile, with default `TIMESTAMP_results.t7`.
+
+The following are saved as a table:
+  * `dev_scores` with dev scores,
+  * `test scores` with test scores,
+  * `opt` with model parameters,
+  * `model` with best model (as determined by cross-validation)
+  * `embeddings` with the updated word embeddings
+
 ### Parameters
 
-The following parameters are allowed by the torch code.
-  * `cudnn`: Use GPUs if set to 1, otherwise set to 0
-  * `num_epochs`: Number of training epochs.
+The following is a list of complete parameters allowed by the torch code.
   * `model_type`: Model architecture, as described above. Options: rand, static, nonstatic, multichannel
-  * `data`: Training dataset to use, including word2vec data. This should be a `.hdf5` file made with `make_hdf5.py`.
+  * `data`: Training dataset to use, including word2vec data. This should be a `.hdf5` file made with `preprocess.py`.
+  * `cudnn`: Use GPUs if set to 1, otherwise set to 0
   * `seed`: Random seed, set to -1 for actual randomness
   * `folds`: Number of folds for cross-validation.
-  * `has_test`: Set 1 if data has test set
-  * `has_dev`: Set 1 if data has dev set
-  * `zero_indexing`: Set 1 if data is zero indexed
   * `debug`: Print debugging info including timing and confusions
+  * `savefile`: Name of output `.t7` file, which will hold the trained model. Default is `TIMESTAMP_results`
+  * `zero_indexing`: Set 1 if data is zero indexed
 
 Training parameters:
+  * `num_epochs`: Number of training epochs.
   * `optim_method`: Gradient descent method. Options: adadelta, adam
   * `L2s`: Set L2 norm of final linear layer weights to this.
   * `batch_size`: Batch size for training.
 
 Model parameters:
   * `num_feat_maps`: Number of convolution feature maps.
-  * `kernel1`, `kernel2`, `kernel3`: Kernel size of different convolutions.
+  * `kernels`: Kernel sizes of different convolutions.
   * `dropout_p`: Dropout probability.
-  * `num_classes`: Number of prediction classes.
   * `highway_mlp`: Number of highway MLP layers (0 for none)
   * `highway_conv_layers`: Number of highway convolutional layers (0 for none)
   * `skip_kernel`: Set 1 to use skip kernels
-
-### Output
-
-When training is complete, the code outputs the following table into a file `TIMESTAMP_results.t7`:
-  * `dev_scores` with dev scores,
-  * `test scores` with test scores,
-  * `opts` with model parameters,
-  * `model` with best model (as determined by cross-validation)
-  * `embeddings` if nonstatic model type, with the updated word embeddings
 
 ## Results
 
@@ -141,7 +145,7 @@ From these results, we see that using GPUs achieves almost a 50x speedup on trai
 
 ## Relevant publications
 
-This code is based on Kim (2014) and its corresponding Theano [code](https://github.com/yoonkim/CNN_sentence/). 
+This code is based on Kim (2014) and the corresponding Theano [code](https://github.com/yoonkim/CNN_sentence/). 
 
     Kim, Y. (2014). Convolutional Neural Networks for Sentence Classification. In Proceedings of the 2014 Conference on Empirical Methods in Natural Language Processing (EMNLP), pp. 1746–1751, Doha, Qatar. Association for Computational Linguistics.
 
