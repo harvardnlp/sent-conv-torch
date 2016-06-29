@@ -84,6 +84,9 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
     optim_method(func, params, config, state)
     -- reset padding embedding to zero
     layers.w2v.weight[1]:zero()
+    if opt.model_type == 'multichannel' then
+      layers.chan1.weight[1]:zero()
+    end
     if opt.skip_kernel > 0 then
       -- keep skip kernel at zero
       layers.skip_conv.weight:select(3,3):zero()

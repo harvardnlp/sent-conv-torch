@@ -125,14 +125,7 @@ function ModelBuilder:make_net(w2v)
   linear.weight:normal():mul(0.01)
   linear.bias:zero()
 
-  local softmax
-  if opt.cudnn == 1 then
-    softmax = cudnn.LogSoftMax()
-  else
-    softmax = nn.LogSoftMax()
-  end
-
-  local output = softmax(linear(nn.Dropout(opt.dropout_p)(last_layer))) 
+  local output = nn.LogSoftMax()(linear(nn.Dropout(opt.dropout_p)(last_layer))) 
   model = nn.gModule({input}, {output})
   return model
 end

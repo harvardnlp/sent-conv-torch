@@ -11,13 +11,13 @@ cmd:text()
 cmd:text('Convolutional net for sentence classification')
 cmd:text()
 cmd:text('Options')
-cmd:option('-model_type', 'rand', 'Model type. Options: rand (randomly initialized word embeddings), static (pre-trained embeddings from word2vec, static during learning), nonstatic (pre-trained embeddings, tuned during learning), multichannel (two embedding channels, one static and one nonstatic)')
-cmd:option('-data', 'MR.hdf5', 'Training data and word2vec data')
+cmd:option('-model_type', 'nonstatic', 'Model type. Options: rand (randomly initialized word embeddings), static (pre-trained embeddings from word2vec, static during learning), nonstatic (pre-trained embeddings, tuned during learning), multichannel (two embedding channels, one static and one nonstatic)')
+cmd:option('-data', '', 'Training data and word2vec data')
 cmd:option('-cudnn', 0, 'Use cudnn and GPUs if set to 1, otherwise set to 0')
-cmd:option('-seed', -1, 'random seed, set -1 for actual random')
+cmd:option('-seed', 3435, 'random seed, set -1 for actual random')
 cmd:option('-folds', 10, 'number of folds to use. If test set provided, folds=1. max 10')
 cmd:option('-debug', 0, 'print debugging info including timing, confusions')
-cmd:option('-gpuid', 1, 'GPU device id to use.')
+cmd:option('-gpuid', 0, 'GPU device id to use.')
 cmd:option('-savefile', '', 'Name of output file, which will hold the trained model, model parameters, and training scores. Default filename is TIMESTAMP_results')
 cmd:option('-zero_indexing', 0, 'If data is zero indexed')
 cmd:text()
@@ -226,6 +226,7 @@ function load_data()
   local test, test_label
 
   print('loading data...')
+  assert(opt.data ~= '', 'must provide hdf5 datafile')
   local f = hdf5.open(opt.data, 'r')
   local w2v = f:read('w2v'):all()
   train = f:read('train'):all()
@@ -330,7 +331,7 @@ function main()
 
   local savefile
   if opt.savefile ~= '' then
-    savefile = opt.savefile
+    savefile = string.format('results/%s.t7', opt.savefile)
   else
     savefile = string.format('results/%s_model.t7', os.date('%Y%m%d_%H%M'))
   end
