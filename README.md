@@ -65,15 +65,7 @@ There are four main model architectures we implemented, as described in Kim (201
 
 It is highly recommended that GPUs are used during training if possible (see Results section for timing benchmarks).
 
-### Model augmentations
-
-A few modifications were made to the model architecture as experiments.
-
-  * we include an option to include highway layers at the final MLP step (which increases depth of the model),
-  * we also include highway layers at the convolutional step (which performs multiple convolutions on the resulting feature maps) as an option,
-  * we experimented with skip kernels of size 5 (added in parallel with the other kernel sizes)
-
-Results from these experiments are described below in the Results section.
+Separating out training and testing is easy; use the parameters `-train_only` and `-test_only`. Also, pretrained models at any stage can be loaded from a `.t7` file with `-warm_start_model` (see more parameters below).
 
 ### Output
 
@@ -86,6 +78,16 @@ The following are saved as a table:
   * `model` with best model (as determined by dev score),
   * `embeddings` with the updated word embeddings
 
+### Model augmentations
+
+A few modifications were made to the model architecture as experiments.
+
+  * we include an option to include highway layers at the final MLP step (which increases depth of the model),
+  * we also include highway layers at the convolutional step (which performs multiple convolutions on the resulting feature maps) as an option,
+  * we experimented with skip kernels of size 5 (added in parallel with the other kernel sizes)
+
+Results from these experiments are described below in the Results section.
+
 ### Parameters
 
 The following is a list of complete parameters allowed by the torch code.
@@ -96,16 +98,19 @@ The following is a list of complete parameters allowed by the torch code.
   * `folds`: Number of folds for cross-validation.
   * `debug`: Print debugging info including timing and confusions
   * `savefile`: Name of output `.t7` file, which will hold the trained model. Default is `TIMESTAMP_results`
-  * `zero_indexing`: Set 1 if data is zero indexed
+  * `zero_indexing`: Set to 1 if data is zero indexed
+  * `warm_start_model`: Load a `.t7` file with pretrained model. Should contain a table with key 'model'
+  * `train_only`: Set to 1 to only train (no testing)
+  * `test_only`: Given a `.t7` file with model, test on testing data
   * `dump_feature_maps_file`: Filename for dumping feature maps of convolution at test time. This will be a `.hdf5` file with fields `feature_maps` for the features at each time step and `word_idxs` for the word indexes (aligned with the last word of the filter). This currently only works for models with a single filter size. This is saved for the best model on fold 1.
 
-Training parameters:
+Training hyperparameters:
   * `num_epochs`: Number of training epochs.
   * `optim_method`: Gradient descent method. Options: adadelta, adam
   * `L2s`: Set L2 norm of final linear layer weights to this.
   * `batch_size`: Batch size for training.
 
-Model parameters:
+Model hyperparameters:
   * `num_feat_maps`: Number of convolution feature maps.
   * `kernels`: Kernel sizes of different convolutions.
   * `dropout_p`: Dropout probability.
