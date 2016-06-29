@@ -4,7 +4,7 @@ require 'nngraph'
 
 local ModelBuilder = torch.class('ModelBuilder')
 
-function ModelBuilder:make_net(w2v)
+function ModelBuilder:make_net(w2v, opt)
   if opt.cudnn == 1 then
     require 'cudnn'
     require 'cunn'
@@ -90,6 +90,7 @@ function ModelBuilder:make_net(w2v)
 
     conv.weight:uniform(-0.01, 0.01)
     conv.bias:zero()
+    conv.name = 'convolution'
     table.insert(layer1, max_time)
   end
 

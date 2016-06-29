@@ -77,13 +77,13 @@ Results from these experiments are described below in the Results section.
 
 ### Output
 
-When training is complete, the code outputs a file with name -savefile, with default `TIMESTAMP_results.t7`.
+The code outputs a checkpoint `.t7` file for every fold with name -savefile. The default name is `TIMESTAMP_results`.
 
 The following are saved as a table:
   * `dev_scores` with dev scores,
   * `test scores` with test scores,
   * `opt` with model parameters,
-  * `model` with best model (as determined by cross-validation)
+  * `model` with best model (as determined by dev score),
   * `embeddings` with the updated word embeddings
 
 ### Parameters
@@ -97,6 +97,7 @@ The following is a list of complete parameters allowed by the torch code.
   * `debug`: Print debugging info including timing and confusions
   * `savefile`: Name of output `.t7` file, which will hold the trained model. Default is `TIMESTAMP_results`
   * `zero_indexing`: Set 1 if data is zero indexed
+  * `dump_feature_maps_file`: Filename for dumping feature maps of convolution at test time. This will be a `.hdf5` file with fields `feature_maps` for the features at each time step and `word_idxs` for the word indexes (aligned with the last word of the filter). This currently only works for models with a single filter size. This is saved for the best model on fold 1.
 
 Training parameters:
   * `num_epochs`: Number of training epochs.

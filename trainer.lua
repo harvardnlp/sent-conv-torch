@@ -5,7 +5,7 @@ require 'torch'
 local Trainer = torch.class('Trainer')
 
 -- Perform one epoch of training.
-function Trainer:train(train_data, train_labels, model, criterion, optim_method, layers, state, params, grads)
+function Trainer:train(train_data, train_labels, model, criterion, optim_method, layers, state, params, grads, opt)
   model:training()
 
   local train_size = train_data:size(1)
@@ -122,7 +122,7 @@ function Trainer:train(train_data, train_labels, model, criterion, optim_method,
   return confusion.totalValid
 end
 
-function Trainer:test(test_data, test_labels, model, criterion)
+function Trainer:test(test_data, test_labels, model, criterion, layers, dump_features, opt)
   model:evaluate()
 
   local classes = {}
@@ -132,10 +132,11 @@ function Trainer:test(test_data, test_labels, model, criterion)
   local confusion = optim.ConfusionMatrix(classes)
   confusion:zero()
 
+  -- dump feature maps
+  local feature_maps
+
   local test_size = test_data:size(1)
-
   local total_err = 0
-
   for t = 1, test_size, opt.batch_size do
     -- data samples and labels, in mini batches.
     local batch_size = math.min(opt.batch_size, test_size - t + 1)
@@ -150,6 +151,12 @@ function Trainer:test(test_data, test_labels, model, criterion)
     end
 
     local outputs = model:forward(inputs)
+    -- dump feature maps from model forward
+    if feature_maps == nil then
+      feature_maps = layers['conv'].output:squeeze()
+    else
+      feature_maps = torch.cat(feature_maps, layers['conv'].output:squeeze(), 1)
+    end
     local err = criterion:forward(outputs, targets)
     total_err = total_err + err * batch_size
 
@@ -161,6 +168,17 @@ function Trainer:test(test_data, test_labels, model, criterion)
   if opt.debug == 1 then
     print(confusion)
     print('Total err: ' .. total_err / test_size)
+  end
+
+  if dump_features then
+    assert(#opt.kernels == 1, 'multiple kernels not yet supported')
+    local kernel = opt.kernels[1]
+    local word_idxs = test_data:narrow(2, kernel, test_data:size(2) - kernel + 1)
+
+    local f = hdf5.open(opt.dump_feature_maps_file .. '.hdf5', 'w')
+    f:write('feature_maps', feature_maps:double())
+    f:write('word_idxs', word_idxs:long())
+    f:close()
   end
 
   -- return error percent

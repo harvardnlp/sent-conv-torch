@@ -20,6 +20,7 @@ cmd:option('-debug', 0, 'print debugging info including timing, confusions')
 cmd:option('-gpuid', 0, 'GPU device id to use.')
 cmd:option('-savefile', '', 'Name of output file, which will hold the trained model, model parameters, and training scores. Default filename is TIMESTAMP_results')
 cmd:option('-zero_indexing', 0, 'If data is zero indexed')
+cmd:option('-dump_feature_maps_file', '', 'Set file to dump feature maps of convolution')
 cmd:text()
 
 -- Preset by preprocessed data
@@ -53,10 +54,29 @@ cmd:option('-highway_mlp', 0, 'Number of highway MLP layers')
 cmd:option('-highway_conv_layers', 0, 'Number of highway MLP layers')
 cmd:text()
 
+function save_progress(fold_dev_scores, fold_test_scores, best_model, fold, opt)
+  local savefile
+  if opt.savefile ~= '' then
+    savefile = string.format('results/%s_%d.t7', opt.savefile, fold)
+  else
+    savefile = string.format('results/%s_model_%d.t7', os.date('%Y%m%d_%H%M'), fold)
+  end
+  print('saving checkpoint to ', savefile)
+  local save = {}
+  save['dev_scores'] = fold_dev_scores
+  if opt.train_only == 0 then
+    save['test_scores'] = fold_test_scores
+  end
+  save['opt'] = opt
+  save['model'] = best_model
+  save['embeddings'] = get_layer(best_model, 'nn.LookupTable').weight
+  torch.save(savefile, save)
+end
+
 function get_layer(model, name)
   local named_layer
   function get(layer)
-    if torch.typename(layer) == name or layer.name == name then
+    if layer.name == name or torch.typename(layer) == name then
       named_layer = layer
     end
   end
@@ -72,7 +92,7 @@ function build_model(w2v)
 
   local model
   if opt.warm_start_model == '' then
-    model = model_builder:make_net(w2v)
+    model = model_builder:make_net(w2v, opt)
   else
     require "nngraph"
     if opt.cudnn == 1 then
@@ -94,6 +114,7 @@ function build_model(w2v)
   local layers = {}
   layers['linear'] = get_layer(model, 'nn.Linear')
   layers['w2v'] = get_layer(model, 'nn.LookupTable')
+  layers['conv'] = get_layer(model, 'convolution')
   if opt.skip_kernel > 0 then
     layers['skip_conv'] = get_layer(model, 'skip_conv')
   end
@@ -182,9 +203,10 @@ function train_loop(all_train, all_train_label, test, test_label, dev, dev_label
       local epoch_time = timer:time().real
 
       -- Train
-      local train_err = trainer:train(train, train_label, model, criterion, optim_method, layers, state, params, grads)
+      local train_err = trainer:train(train, train_label, model, criterion, optim_method,
+                                      layers, state, params, grads, opt)
       -- Dev
-      local dev_err = trainer:test(dev, dev_label, model, criterion)
+      local dev_err = trainer:test(dev, dev_label, model, criterion, layers, false, opt)
       if dev_err > best_err then
         best_model = model:clone()
         best_epoch = epoch
@@ -205,7 +227,8 @@ function train_loop(all_train, all_train_label, test, test_label, dev, dev_label
 
     -- Testing.
     if opt.train_only == 0 then
-      local test_err = trainer:test(test, test_label, best_model, criterion)
+      local dump_features = ((opt.dump_feature_maps_file ~= '') and (fold == 1))
+      local test_err = trainer:test(test, test_label, best_model, criterion, layers, dump_features, opt)
       print('test perf ', 100*test_err, '%')
       table.insert(fold_test_scores, test_err)
     end
@@ -215,6 +238,9 @@ function train_loop(all_train, all_train_label, test, test_label, dev, dev_label
       print('time for one fold: ', (timer:time().real - fold_time * 1000), 'ms')
       print('\n')
     end
+
+    -- save model progress
+    save_progress(fold_dev_scores, fold_test_scores, best_model, fold, opt)
   end
 
   return fold_dev_scores, fold_test_scores, best_model
@@ -298,12 +324,18 @@ function main()
 
   if opt.test_only == 1 then
     assert(opt.warm_start_model ~= '', 'must have -warm_start_model for testing')
-    assert(opt.has_test == 1)
+    if opt.has_test ~= 1 then
+      print('dataset has no test file: using train instead')
+      test = train
+      test_label = train_label
+    end
+
     local Trainer = require "trainer"
     local trainer = Trainer.new()
     print('Testing...')
-    local model, criterion = build_model(w2v)
-    local test_err = trainer:test(test, test_label, model, criterion)
+    local model, criterion, layers = build_model(w2v)
+    local dump_features = (opt.dump_feature_maps_file ~= '')
+    local test_err = trainer:test(test, test_label, model, criterion, layers, dump_features, opt)
     print('Test score:', test_err)
     os.exit()
   end
@@ -312,6 +344,9 @@ function main()
     -- don't do CV if we have a test set, or are training only
     opt.folds = 1
   end
+
+  -- make sure output directory exists - results are saved within train_loop
+  if not path.exists('results') then lfs.mkdir('results') end
 
   -- training loop
   local fold_dev_scores, fold_test_scores, best_model = train_loop(train, train_label, test, test_label, dev, dev_label, w2v)
@@ -325,27 +360,6 @@ function main()
     print(fold_test_scores)
     print('average test score: ', torch.Tensor(fold_test_scores):mean())
   end
-
-  -- make sure output directory exists
-  if not path.exists('results') then lfs.mkdir('results') end
-
-  local savefile
-  if opt.savefile ~= '' then
-    savefile = string.format('results/%s.t7', opt.savefile)
-  else
-    savefile = string.format('results/%s_model.t7', os.date('%Y%m%d_%H%M'))
-  end
-  print('saving results to ', savefile)
-
-  local save = {}
-  save['dev_scores'] = fold_dev_scores
-  if opt.train_only == 0 then
-    save['test_scores'] = fold_test_scores
-  end
-  save['opt'] = opt
-  save['model'] = best_model
-  save['embeddings'] = get_layer(best_model, 'nn.LookupTable').weight
-  torch.save(savefile, save)
 end
 
 main()
