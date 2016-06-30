@@ -2,6 +2,8 @@ require 'nn'
 require 'sys'
 require 'torch'
 
+require 'util'
+
 local Trainer = torch.class('Trainer')
 
 -- Perform one epoch of training.
@@ -134,6 +136,7 @@ function Trainer:test(test_data, test_labels, model, criterion, layers, dump_fea
 
   -- dump feature maps
   local feature_maps
+  local conv_layer = get_layer(model, 'convolution')
 
   local test_size = test_data:size(1)
   local total_err = 0
@@ -153,10 +156,11 @@ function Trainer:test(test_data, test_labels, model, criterion, layers, dump_fea
     local outputs = model:forward(inputs)
     -- dump feature maps from model forward
     if feature_maps == nil then
-      feature_maps = layers['conv'].output:squeeze()
+      feature_maps = conv_layer.output:squeeze()
     else
-      feature_maps = torch.cat(feature_maps, layers['conv'].output:squeeze(), 1)
+      feature_maps = torch.cat(feature_maps, conv_layer.output:squeeze(), 1)
     end
+
     local err = criterion:forward(outputs, targets)
     total_err = total_err + err * batch_size
 
@@ -174,8 +178,11 @@ function Trainer:test(test_data, test_labels, model, criterion, layers, dump_fea
     assert(#opt.kernels == 1, 'multiple kernels not yet supported')
     local kernel = opt.kernels[1]
     local word_idxs = test_data:narrow(2, kernel, test_data:size(2) - kernel + 1)
+    assert(feature_maps:size(1) == word_idxs:size(1), 'length mismatch')
 
-    local f = hdf5.open(opt.dump_feature_maps_file .. '.hdf5', 'w')
+    local filename = opt.dump_feature_maps_file .. '.hdf5'
+    print('dumping features to ' .. filename)
+    local f = hdf5.open(filename, 'w')
     f:write('feature_maps', feature_maps:double())
     f:write('word_idxs', word_idxs:long())
     f:close()

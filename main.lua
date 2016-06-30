@@ -3,6 +3,8 @@ require 'nn'
 require 'optim'
 require 'lfs'
 
+require 'util'
+
 -- Flags
 cmd = torch.CmdLine()
 
@@ -73,18 +75,6 @@ function save_progress(fold_dev_scores, fold_test_scores, best_model, fold, opt)
   torch.save(savefile, save)
 end
 
-function get_layer(model, name)
-  local named_layer
-  function get(layer)
-    if layer.name == name or torch.typename(layer) == name then
-      named_layer = layer
-    end
-  end
-
-  model:apply(get)
-  return named_layer
-end
-
 -- build model for training
 function build_model(w2v)
   local ModelBuilder = require 'model.convNN'
@@ -114,7 +104,6 @@ function build_model(w2v)
   local layers = {}
   layers['linear'] = get_layer(model, 'nn.Linear')
   layers['w2v'] = get_layer(model, 'nn.LookupTable')
-  layers['conv'] = get_layer(model, 'convolution')
   if opt.skip_kernel > 0 then
     layers['skip_conv'] = get_layer(model, 'skip_conv')
   end
