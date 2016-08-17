@@ -77,7 +77,7 @@ end
 
 -- build model for training
 function build_model(w2v)
-  local ModelBuilder = require 'model.convNN'
+  local ModelBuilder = require 'model/convNN.lua'
   local model_builder = ModelBuilder.new()
 
   local model
