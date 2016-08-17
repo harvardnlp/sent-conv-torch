@@ -3,7 +3,7 @@ require 'nn'
 require 'optim'
 require 'lfs'
 
-require 'util'
+require 'util.lua'
 
 -- Flags
 cmd = torch.CmdLine()
