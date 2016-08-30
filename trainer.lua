@@ -155,10 +155,16 @@ function Trainer:test(test_data, test_labels, model, criterion, layers, dump_fea
 
     local outputs = model:forward(inputs)
     -- dump feature maps from model forward
-    if feature_maps == nil then
-      feature_maps = conv_layer.output:squeeze(4)
+    local cur_feature_maps
+    if opt.cudnn == 1 then
+      cur_feature_maps = conv_layer.output:squeeze(4)
     else
-      feature_maps = torch.cat(feature_maps, conv_layer.output:squeeze(4), 1)
+      cur_feature_maps = conv_layer.output
+    end
+    if feature_maps == nil then
+      feature_maps = cur_feature_maps
+    else
+      feature_maps = torch.cat(feature_maps, cur_feature_maps, 1)
     end
 
     local err = criterion:forward(outputs, targets)
