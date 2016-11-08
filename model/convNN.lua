@@ -2,9 +2,7 @@ require 'torch'
 require 'nn'
 require 'nngraph'
 
-local ModelBuilder = torch.class('ModelBuilder')
-
-function ModelBuilder:make_net(w2v, opt)
+function make_net(w2v, opt)
   if opt.cudnn == 1 then
     require 'cudnn'
     require 'cunn'
@@ -130,5 +128,3 @@ function ModelBuilder:make_net(w2v, opt)
   model = nn.gModule({input}, {output})
   return model
 end
-
-return ModelBuilder

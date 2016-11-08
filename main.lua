@@ -3,6 +3,7 @@ require 'nn'
 require 'optim'
 require 'lfs'
 
+require 'model/convNN.lua'
 require 'util.lua'
 
 -- Flags
@@ -77,12 +78,9 @@ end
 
 -- build model for training
 function build_model(w2v)
-  local ModelBuilder = require 'model/convNN.lua'
-  local model_builder = ModelBuilder.new()
-
   local model
   if opt.warm_start_model == '' then
-    model = model_builder:make_net(w2v, opt)
+    model = make_net(w2v, opt)
   else
     require "nngraph"
     if opt.cudnn == 1 then

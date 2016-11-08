@@ -10,7 +10,7 @@ To make data in hdf5 format, run the following (with word2vec .bin path and choi
 
 To run training with GPUs:
 
-    th main.lua -data MR.hdf5 -cudnn 1
+    th main.lua -data MR.hdf5 -cudnn 1 -gpuid 1
 
 Results are timestamped and saved to the `results/` directory.
 
