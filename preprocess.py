@@ -98,7 +98,7 @@ def load_data(dataset, train_name, test_name='', dev_name='', padding=4):
   for d, lbl, f in zip(data, data_label, files):
     for line in f:
       words = line_to_words(line, dataset)
-      y = int(line[0].split()[0]) + 1
+      y = int(line.strip().split()[0]) + 1
       sent = [word_to_idx[word] for word in words]
       # end padding
       if len(sent) < max_sent_len + padding:
