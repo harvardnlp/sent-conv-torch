@@ -202,12 +202,7 @@ def main():
   for word, vec in w2v.items():
     embed[word_to_idx[word] - 1] = vec
 
-  # Shuffle train
   print 'train size:', train.shape
-  N = train.shape[0]
-  perm = np.random.permutation(N)
-  train = train[perm]
-  train_label = train_label[perm]
 
   filename = dataset + '.hdf5'
   with h5py.File(filename, "w") as f:

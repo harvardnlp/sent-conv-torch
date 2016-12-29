@@ -38,6 +38,7 @@ cmd:text()
 -- Training own dataset
 cmd:option('-train_only', 0, 'Set to 1 to only train on data. Default is cross-validation')
 cmd:option('-test_only', 0, 'Set to 1 to only do testing. Must have a -warm_start_model')
+cmd:option('-preds_file', '', 'On test data, write predictions to an output file. Set test_only to 1 to use')
 cmd:option('-warm_start_model', '', 'Path to .t7 file with pre-trained model. Should contain a table with key \'model\'')
 cmd:text()
 

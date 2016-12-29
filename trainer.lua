@@ -134,6 +134,12 @@ function Trainer:test(test_data, test_labels, model, criterion, layers, dump_fea
   local confusion = optim.ConfusionMatrix(classes)
   confusion:zero()
 
+  local preds_file
+  if opt.test_only == 1 and opt.preds_file ~= '' then
+    print('Writing predictions to ' .. opt.preds_file)
+    preds_file = io.open(opt.preds_file, 'w')
+  end
+
   -- dump feature maps
   local feature_maps
   local conv_layer = get_layer(model, 'convolution')
@@ -156,15 +162,26 @@ function Trainer:test(test_data, test_labels, model, criterion, layers, dump_fea
     local outputs = model:forward(inputs)
     -- dump feature maps from model forward
     local cur_feature_maps
-    if opt.cudnn == 1 then
-      cur_feature_maps = conv_layer.output:squeeze(4)
-    else
-      cur_feature_maps = conv_layer.output
+    if dump_features then
+      if opt.cudnn == 1 then
+        cur_feature_maps = conv_layer.output:squeeze(4)
+      else
+        cur_feature_maps = conv_layer.output
+      end
+      if feature_maps == nil then
+        feature_maps = cur_feature_maps
+      else
+        feature_maps = torch.cat(feature_maps, cur_feature_maps, 1)
+      end
     end
-    if feature_maps == nil then
-      feature_maps = cur_feature_maps
-    else
-      feature_maps = torch.cat(feature_maps, cur_feature_maps, 1)
+
+    if opt.test_only == 1 and opt.preds_file ~= '' then
+      -- write predictions to file
+      local _,preds = torch.max(outputs, 2)
+      for j = 1, preds:size(1) do
+        -- zero index
+        preds_file:write((preds[j][1] - 1) .. '\n')
+      end
     end
 
     local err = criterion:forward(outputs, targets)
@@ -192,6 +209,10 @@ function Trainer:test(test_data, test_labels, model, criterion, layers, dump_fea
     f:write('feature_maps', feature_maps:double())
     f:write('word_idxs', word_idxs:long())
     f:close()
+  end
+
+  if opt.test_only == 1 and opt.preds_file ~= '' then
+    preds_file:close()
   end
 
   -- return error percent

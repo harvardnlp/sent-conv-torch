@@ -103,6 +103,7 @@ The following is a list of complete parameters allowed by the torch code.
   * `train_only`: Set to 1 to only train (no testing)
   * `test_only`: Given a `.t7` file with model, test on testing data
   * `dump_feature_maps_file`: Filename for dumping feature maps of convolution at test time. This will be a `.hdf5` file with fields `feature_maps` for the features at each time step and `word_idxs` for the word indexes (aligned with the last word of the filter). This currently only works for models with a single filter size. This is saved for the best model on fold 1.
+  * `preds_file`: Filename for writing predictions (with `test_only` set to 1). Output is zero indexed.
 
 Training hyperparameters:
   * `num_epochs`: Number of training epochs.
