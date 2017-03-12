@@ -4,13 +4,13 @@ import re
 import sys
 import operator
 import argparse
-
+import gzip
 def load_bin_vec(fname, vocab):
     """
     Loads 300x1 word vecs from Google (Mikolov) word2vec
     """
     word_vecs = {}
-    with open(fname, "rb") as f:
+    with gzip.open(fname, "rb") as f:
         header = f.readline()
         vocab_size, layer1_size = map(int, header.split())
         binary_len = np.dtype('float32').itemsize * layer1_size
