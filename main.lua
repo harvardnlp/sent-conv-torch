@@ -253,6 +253,7 @@ function load_data()
     opt.has_dev = 1
     dev = f:read('dev'):all()
     dev_label = f:read('dev_label'):all()
+    assert(torch.max(dev_label) <= opt.num_classes, 'more valid classes than train')
   end
   if f:read('test'):dataspaceSize()[1] == 0 then
     opt.has_test = 0
@@ -260,6 +261,7 @@ function load_data()
     opt.has_test = 1
     test = f:read('test'):all()
     test_label = f:read('test_label'):all()
+    assert(torch.max(test_label) <= opt.num_classes, 'more test classes than train')
   end
   print('data loaded!')
 
