@@ -57,6 +57,7 @@ function make_net(w2v, opt)
       else
         if opt.highway_conv_layers > 0 then
           -- Highway conv layers
+          local HighwayConv = require 'model/highway_conv'
           local highway_conv = HighwayConv.conv(opt.vec_size, opt.max_sent, kernels[i], opt.highway_conv_layers)
           conv_layer = nn.Reshape(opt.num_feat_maps, opt.max_sent-kernels[i]+1, true)(
             conv(nn.Reshape(1, opt.max_sent, opt.vec_size, true)(
@@ -115,6 +116,7 @@ function make_net(w2v, opt)
   local last_layer = conv_layer_concat
   if opt.highway_mlp > 0 then
     -- use highway layers
+    local HighwayMLP = require 'model/highway_mlp'
     local highway = HighwayMLP.mlp((#layer1) * opt.num_feat_maps, opt.highway_layers)
     last_layer = highway(conv_layer_concat)
   end
