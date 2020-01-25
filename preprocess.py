@@ -12,9 +12,9 @@ def load_bin_vec(fname, vocab):
     word_vecs = {}
     with open(fname, "rb") as f:
         header = f.readline()
-        vocab_size, layer1_size = map(int, header.split())
+        vocab_size, layer1_size = list(map(int, header.split()))
         binary_len = np.dtype('float32').itemsize * layer1_size
-        for line in xrange(vocab_size):
+        for line in range(vocab_size):
             word = []
             while True:
                 ch = f.read(1)
@@ -187,22 +187,22 @@ def main():
   # Write word mapping to text file.
   with open(dataset + '_word_mapping.txt', 'w+') as embeddings_f:
     embeddings_f.write("*PADDING* 1\n")
-    for word, idx in sorted(word_to_idx.items(), key=operator.itemgetter(1)):
+    for word, idx in sorted(list(word_to_idx.items()), key=operator.itemgetter(1)):
       embeddings_f.write("%s %d\n" % (word, idx))
 
   # Load word2vec
   w2v = load_bin_vec(args.w2v, word_to_idx)
   V = len(word_to_idx) + 1
-  print 'Vocab size:', V
+  print('Vocab size:', V)
 
   # Not all words in word_to_idx are in w2v.
   # Word embeddings initialized to random Unif(-0.25, 0.25)
-  embed = np.random.uniform(-0.25, 0.25, (V, len(w2v.values()[0])))
+  embed = np.random.uniform(-0.25, 0.25, (V, len(list(w2v.values())[0])))
   embed[0] = 0
-  for word, vec in w2v.items():
+  for word, vec in list(w2v.items()):
     embed[word_to_idx[word] - 1] = vec
 
-  print 'train size:', train.shape
+  print('train size:', train.shape)
 
   filename = dataset + '.hdf5'
   with h5py.File(filename, "w") as f:
