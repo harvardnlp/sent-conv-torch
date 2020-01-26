@@ -10,23 +10,31 @@ def load_bin_vec(fname, vocab):
     Loads 300x1 word vecs from Google (Mikolov) word2vec
     """
     word_vecs = {}
+    print(len(vocab))
     with open(fname, "rb") as f:
         header = f.readline()
         vocab_size, layer1_size = list(map(int, header.split()))
         binary_len = np.dtype('float32').itemsize * layer1_size
+        i = 0
         for line in range(vocab_size):
+            # print(i+1)
+            # i+=1
             word = []
             while True:
-                ch = f.read(1)
+                try:
+                  ch = f.read(1).decode("utf-8")
+                except:
+                  continue
                 if ch == ' ':
                     word = ''.join(word)
                     break
                 if ch != '\n':
                     word.append(ch)   
             if word in vocab:
-               word_vecs[word] = np.fromstring(f.read(binary_len), dtype='float32')  
+              word_vecs[word] = np.fromstring(f.read(binary_len), dtype='float32')  
             else:
-                f.read(binary_len)
+              f.read(binary_len)
+    print("Load word2vec Done")
     return word_vecs
 
 def line_to_words(line, dataset):
@@ -47,8 +55,14 @@ def get_vocab(file_list, dataset=''):
 
   for filename in file_list:
     f = open(filename, "r")
+    idx_start = 0
     for line in f:
-        words = line_to_words(line, dataset)
+        idx_start +=1
+        if idx_start == 1:
+          continue
+        actuall_line = ""
+        actuall_line = line.strip()[10:-1]
+        words = line_to_words(actuall_line, dataset)
         max_sent_len = max(max_sent_len, len(words))
         for word in words:
             if not word in word_to_idx:
@@ -96,9 +110,16 @@ def load_data(dataset, train_name, test_name='', dev_name='', padding=4):
     data_label.append(dev_label)
 
   for d, lbl, f in zip(data, data_label, files):
+    idx = 0
     for line in f:
-      words = line_to_words(line, dataset)
-      y = int(line.strip().split()[0]) + 1
+      idx +=1
+      if idx == 1:
+        continue
+      actuall_line = ""
+      actuall_line = line.strip()[10:-1]
+      words = line_to_words(actuall_line, dataset)
+      # y = int(line.strip().split()[0]) + 1
+      y = int(line.strip()[7])
       sent = [word_to_idx[word] for word in words]
       # end padding
       if len(sent) < max_sent_len + padding:
@@ -114,7 +135,7 @@ def load_data(dataset, train_name, test_name='', dev_name='', padding=4):
     f_test.close()
   if not dev_name == '':
     f_dev.close()
-
+  print("Load Data Done")
   return word_to_idx, np.array(train, dtype=np.int32), np.array(train_label, dtype=np.int32), np.array(test, dtype=np.int32), np.array(test_label, dtype=np.int32), np.array(dev, dtype=np.int32), np.array(dev_label, dtype=np.int32)
 
 def clean_str(string):
