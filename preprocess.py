@@ -17,8 +17,6 @@ def load_bin_vec(fname, vocab):
         binary_len = np.dtype('float32').itemsize * layer1_size
         i = 0
         for line in range(vocab_size):
-            # print(i+1)
-            # i+=1
             word = []
             while True:
                 try:
